@@ -13,7 +13,7 @@ from config import (
 )
 from dataset import load_dataframe, split_data, build_loaders
 from models import BaselineCNN, build_resnet18
-from trainer import train_model, plot_history
+from trainer import train_model, plot_history, plot_comparison_curves
 from evaluate import full_report
 from gradcam import visualize_gradcam
 
@@ -94,6 +94,7 @@ def main():
 
     combined_history = {k: history_frozen[k] + history_ft[k] for k in history_frozen}
     plot_history(combined_history, 'ResNet18 Transfer Learning')
+    plot_comparison_curves(baseline_history, combined_history, epochs_frozen=EPOCHS_FROZEN)
 
     # ── Stage 6 & 7: Evaluation + Grad-CAM ───────────────────────────────────
     baseline_model.load_state_dict(

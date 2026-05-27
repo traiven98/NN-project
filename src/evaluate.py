@@ -129,5 +129,43 @@ def full_report(baseline_model, resnet_model, test_loader,
 
     plot_confusion_matrix(resnet_labels, resnet_preds)
     plot_f1_comparison(base_labels, base_preds, resnet_labels, resnet_preds)
+    plot_accuracy_comparison(base_acc, base_f1, resnet_acc, resnet_f1)
 
     return base_preds, base_labels, resnet_preds, resnet_labels
+
+
+def plot_accuracy_comparison(base_acc, base_f1, resnet_acc, resnet_f1, save=True):
+    """Bar chart comparing overall Accuracy and Weighted F1 between both models."""
+    os.makedirs(PLOTS_DIR, exist_ok=True)
+
+    metrics_names = ['Test Accuracy', 'Weighted F1']
+    baseline_vals = [base_acc,   base_f1]
+    resnet_vals   = [resnet_acc, resnet_f1]
+
+    x, width = np.arange(len(metrics_names)), 0.35
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    bars1 = ax.bar(x - width / 2, baseline_vals, width, label='Baseline CNN', color='#4C72B0', alpha=0.87)
+    bars2 = ax.bar(x + width / 2, resnet_vals,   width, label='ResNet18 FT',  color='#DD8452', alpha=0.87)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(metrics_names, fontsize=12)
+    ax.set_ylim(0, 1.12)
+    ax.set_ylabel('Score', fontsize=12)
+    ax.set_title('Overall Performance: Baseline CNN vs ResNet18', fontsize=13, fontweight='bold')
+    ax.legend(fontsize=11)
+    ax.grid(axis='y', alpha=0.3)
+
+    for bar in bars1:
+        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.015,
+                f'{bar.get_height():.3f}', ha='center', va='bottom',
+                fontsize=11, fontweight='bold', color='#4C72B0')
+    for bar in bars2:
+        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.015,
+                f'{bar.get_height():.3f}', ha='center', va='bottom',
+                fontsize=11, fontweight='bold', color='#DD8452')
+
+    plt.tight_layout()
+    if save:
+        plt.savefig(os.path.join(PLOTS_DIR, 'accuracy_f1_comparison.png'), dpi=150, bbox_inches='tight')
+    plt.show()
