@@ -96,3 +96,58 @@ def plot_history(history, title, save=True):
     if save:
         plt.savefig(os.path.join(PLOTS_DIR, f'{title.replace(" ", "_")}_history.png'), dpi=150, bbox_inches='tight')
     plt.show()
+
+
+def plot_comparison_curves(baseline_history, combined_history, epochs_frozen, save=True):
+    """Side-by-side training curves for Baseline CNN vs ResNet18 on the same axes.
+
+    A vertical dashed line marks the epoch when the ResNet18 backbone was unfrozen.
+    The two models have different total epoch counts (10 vs 20), so both are plotted
+    with their own x-range on shared axes — the x-axis shows epoch index.
+    """
+    os.makedirs(PLOTS_DIR, exist_ok=True)
+
+    ep_base   = range(1, len(baseline_history['train_loss']) + 1)
+    ep_resnet = range(1, len(combined_history['train_loss']) + 1)
+
+    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+
+    # ── Loss ──────────────────────────────────────────────────────────────────
+    axes[0].plot(ep_base,   baseline_history['train_loss'],
+                 label='Baseline — Train', color='#4C72B0', linewidth=2)
+    axes[0].plot(ep_base,   baseline_history['val_loss'],
+                 label='Baseline — Val',   color='#4C72B0', linewidth=2, linestyle='--')
+    axes[0].plot(ep_resnet, combined_history['train_loss'],
+                 label='ResNet18 — Train', color='#DD8452', linewidth=2)
+    axes[0].plot(ep_resnet, combined_history['val_loss'],
+                 label='ResNet18 — Val',   color='#DD8452', linewidth=2, linestyle='--')
+    axes[0].axvline(x=epochs_frozen, color='gray', linestyle=':', linewidth=1.5,
+                    label=f'ResNet18: backbone unfrozen (ep {epochs_frozen})')
+    axes[0].set_title('Training Loss — Baseline vs ResNet18', fontweight='bold')
+    axes[0].set_xlabel('Epoch')
+    axes[0].set_ylabel('Cross-Entropy Loss')
+    axes[0].legend(fontsize=8)
+    axes[0].grid(alpha=0.3)
+
+    # ── Accuracy ──────────────────────────────────────────────────────────────
+    axes[1].plot(ep_base,   [a * 100 for a in baseline_history['train_acc']],
+                 label='Baseline — Train', color='#4C72B0', linewidth=2)
+    axes[1].plot(ep_base,   [a * 100 for a in baseline_history['val_acc']],
+                 label='Baseline — Val',   color='#4C72B0', linewidth=2, linestyle='--')
+    axes[1].plot(ep_resnet, [a * 100 for a in combined_history['train_acc']],
+                 label='ResNet18 — Train', color='#DD8452', linewidth=2)
+    axes[1].plot(ep_resnet, [a * 100 for a in combined_history['val_acc']],
+                 label='ResNet18 — Val',   color='#DD8452', linewidth=2, linestyle='--')
+    axes[1].axvline(x=epochs_frozen, color='gray', linestyle=':', linewidth=1.5,
+                    label=f'ResNet18: backbone unfrozen (ep {epochs_frozen})')
+    axes[1].set_title('Validation Accuracy — Baseline vs ResNet18', fontweight='bold')
+    axes[1].set_xlabel('Epoch')
+    axes[1].set_ylabel('Accuracy (%)')
+    axes[1].legend(fontsize=8)
+    axes[1].grid(alpha=0.3)
+
+    plt.suptitle('Model Comparison: Training Dynamics', fontsize=14, fontweight='bold')
+    plt.tight_layout()
+    if save:
+        plt.savefig(os.path.join(PLOTS_DIR, 'comparison_training_curves.png'), dpi=150, bbox_inches='tight')
+    plt.show()
