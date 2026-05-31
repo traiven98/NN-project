@@ -16,6 +16,7 @@ from models import BaselineCNN, build_resnet18
 from trainer import train_model, plot_history, plot_comparison_curves
 from evaluate import full_report
 from gradcam import visualize_gradcam
+from eda import run_eda
 
 
 def set_seed():
@@ -33,8 +34,9 @@ def main():
     if device.type == 'cuda':
         print(f'GPU: {torch.cuda.get_device_name(0)}')
 
-    # ── Data ──────────────────────────────────────────────────────────────────
+    # ── Data & EDA ────────────────────────────────────────────────────────────
     df = load_dataframe()
+    run_eda(df)
     train_df, val_df, test_df = split_data(df)
     print(f'Train: {len(train_df)} | Val: {len(val_df)} | Test: {len(test_df)}')
 
