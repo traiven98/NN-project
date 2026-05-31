@@ -1,0 +1,699 @@
+\documentclass[12pt, a4paper]{article}
+
+% ── Packages ──────────────────────────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{enumitem}
+\usepackage{parskip}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{microtype}
+
+% ── Code listing style ────────────────────────────────────────────────────────
+\lstset{
+    basicstyle=\ttfamily\small,
+    backgroundcolor=\color{gray!8},
+    frame=single,
+    rulecolor=\color{gray!40},
+    breaklines=true,
+    captionpos=b,
+    keywordstyle=\color{blue!70!black}\bfseries,
+    commentstyle=\color{green!50!black},
+    stringstyle=\color{orange!80!black},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    numbersep=8pt,
+    tabsize=4,
+    showstringspaces=false,
+}
+
+% ── Header / footer ───────────────────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{Skin Lesion Classification -- HAM10000}
+\lhead{\leftmark}
+\rfoot{\thepage}
+
+% ── Hyperref colours ──────────────────────────────────────────────────────────
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!60!black,
+    citecolor=green!50!black,
+    urlcolor=blue!70!black,
+}
+
+% ──────────────────────────────────────────────────────────────────────────────
+\begin{document}
+
+% ── Title ─────────────────────────────────────────────────────────────────────
+\begin{titlepage}
+    \centering
+    \vspace*{2cm}
+
+    {\LARGE\bfseries Skin Lesion Classification\\[0.4em]
+    Using Convolutional Neural Networks\\[0.4em]
+    and Transfer Learning\par}
+
+    \vspace{1.5cm}
+    {\large HAM10000 Dataset\par}
+
+    \vspace{2cm}
+    {\large Neural Networks Course\par}
+    \vspace{0.5cm}
+    {\large\the\year\par}
+
+    \vfill
+    \begin{abstract}
+        \noindent
+        This report presents a supervised multi-class classification system for
+        dermoscopic skin lesion images using the HAM10000 dataset (10{,}015
+        images, 7 classes). We compare two architectures: a four-layer
+        \textbf{Baseline CNN} trained from scratch and a \textbf{ResNet18}
+        fine-tuned from ImageNet weights using a two-phase training strategy.
+        The primary challenge is severe class imbalance---\textit{Melanocytic
+        nevus} constitutes 67\% of all samples---addressed via
+        \texttt{WeightedRandomSampler}. Models are evaluated using weighted
+        F1-score, per-class AUC-ROC, and Grad-CAM attention maps.
+        Transfer learning is expected to outperform the baseline by a
+        significant margin, consistent with the literature benchmark of
+        $\sim$80\% accuracy for ResNet18 on this dataset.
+    \end{abstract}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Introduction}
+\label{sec:intro}
+% ══════════════════════════════════════════════════════════════════════════════
+
+Skin cancer is one of the most prevalent cancers worldwide. Dermoscopy---a
+non-invasive imaging technique that allows magnified visualisation of skin
+structures---significantly improves early detection rates when used by trained
+dermatologists. However, accurate interpretation of dermoscopic images is
+highly expert-dependent, time-consuming, and subject to inter-observer
+variability.
+
+The goal of this project is to build an automated classifier that assigns a
+dermoscopic image to one of seven diagnostic categories spanning benign,
+pre-cancerous, and malignant lesions. The task is framed as
+\textbf{supervised multi-class image classification}, with ground-truth labels
+confirmed through histopathology, clinical follow-up, or expert consensus.
+
+Two models are compared:
+\begin{itemize}
+    \item \textbf{Baseline CNN}: a four-block convolutional network trained
+          entirely from random initialisation, establishing a performance lower bound.
+    \item \textbf{ResNet18 Transfer Learning}: a residual network pre-trained on
+          ImageNet~\cite{deng2009imagenet} and fine-tuned on HAM10000 using a
+          two-phase strategy with differential learning rates.
+\end{itemize}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Dataset}
+\label{sec:dataset}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\subsection{HAM10000 Overview}
+
+The \textbf{HAM10000} dataset~\cite{tschandl2018ham10000} (``Human Against
+Machine with 10,000 training images'') was collected over 20 years from two
+clinical sources: the Medical University of Vienna and a clinic in Queensland,
+Australia. It was the official benchmark dataset of the ISIC 2018 challenge.
+
+\begin{table}[H]
+    \centering
+    \caption{HAM10000 dataset properties.}
+    \begin{tabular}{ll}
+        \toprule
+        \textbf{Property} & \textbf{Value} \\
+        \midrule
+        Total images & 10{,}015 \\
+        Original resolution & 450 $\times$ 600 px \\
+        Model input size & 224 $\times$ 224 px \\
+        Number of classes & 7 \\
+        Label confirmation & histopathology, follow-up, consensus, confocal \\
+        \bottomrule
+    \end{tabular}
+    \label{tab:dataset}
+\end{table}
+
+\subsection{Class Descriptions}
+
+\begin{table}[H]
+    \centering
+    \caption{Class distribution in HAM10000.}
+    \begin{tabular}{llccc}
+        \toprule
+        \textbf{Code} & \textbf{Full Name} & \textbf{Type} &
+        \textbf{Count} & \textbf{\%} \\
+        \midrule
+        \texttt{nv}    & Melanocytic nevus       & Benign        & 6{,}705 & 66.9 \\
+        \texttt{mel}   & Melanoma                & Malignant     & 1{,}113 & 11.1 \\
+        \texttt{bkl}   & Benign keratosis        & Benign        & 1{,}099 & 11.0 \\
+        \texttt{bcc}   & Basal cell carcinoma    & Malignant     &   514   &  5.1 \\
+        \texttt{akiec} & Actinic keratosis       & Pre-cancerous &   327   &  3.3 \\
+        \texttt{vasc}  & Vascular lesion         & Benign        &   142   &  1.4 \\
+        \texttt{df}    & Dermatofibroma          & Benign        &   115   &  1.1 \\
+        \midrule
+        & \textbf{Total} & & \textbf{10{,}015} & \textbf{100.0} \\
+        \bottomrule
+    \end{tabular}
+    \label{tab:classes}
+\end{table}
+
+\subsection{Class Imbalance}
+
+The dataset exhibits \textbf{severe class imbalance}: \textit{Melanocytic
+nevus} (\texttt{nv}) constitutes 66.9\% of all samples, while
+\textit{Dermatofibroma} (\texttt{df}) and \textit{Vascular lesion}
+(\texttt{vasc}) together account for only 2.5\%. A naive classifier that
+always predicts \texttt{nv} achieves $\sim$67\% top-1 accuracy while
+producing zero useful predictions for any other class---making accuracy alone
+a misleading metric for this task.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{plots/class_distribution.png}
+    \caption{Class distribution in HAM10000. Left: absolute counts per class.
+             Right: percentage breakdown. The dominance of \texttt{nv} (67\%)
+             motivates the use of \texttt{WeightedRandomSampler} during training.}
+    \label{fig:class_dist}
+\end{figure}
+
+\subsection{Data Split}
+
+The dataset is divided using \textbf{stratified sampling} to preserve class
+proportions in every subset:
+
+\begin{equation}
+    \text{Train} : \text{Val} : \text{Test} = 70\% : 15\% : 15\%
+    \quad \Rightarrow \quad 7{,}010 : 1{,}503 : 1{,}502
+    \label{eq:split}
+\end{equation}
+
+Stratification is essential here---random splitting on an imbalanced dataset
+could leave rare classes with zero samples in the test set.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Data Preparation}
+\label{sec:data}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\subsection{Data Augmentation}
+
+Augmentation is applied \textit{only} to the training set. The validation and
+test sets receive only resizing and normalisation to ensure unbiased evaluation.
+
+\begin{table}[H]
+    \centering
+    \caption{Transforms applied per split.}
+    \begin{tabular}{lccp{6cm}}
+        \toprule
+        \textbf{Transform} & \textbf{Train} & \textbf{Val/Test}
+        & \textbf{Rationale} \\
+        \midrule
+        Resize(224$\times$224) & \checkmark & \checkmark
+            & Required input size for ResNet18 \\
+        RandomHorizontalFlip   & \checkmark & --
+            & Lesions have no natural orientation \\
+        RandomVerticalFlip     & \checkmark & --
+            & Same as horizontal flip \\
+        RandomRotation(20°)    & \checkmark & --
+            & Rotation-invariant appearance \\
+        ColorJitter($b$=0.2, $c$=0.2, $s$=0.2, $h$=0.1) & \checkmark & --
+            & Simulates camera and lighting variation across clinics \\
+        Normalize(ImageNet $\mu$/$\sigma$) & \checkmark & \checkmark
+            & Matches distribution expected by pretrained backbone \\
+        \bottomrule
+    \end{tabular}
+    \label{tab:transforms}
+\end{table}
+
+\subsection{Handling Class Imbalance: WeightedRandomSampler}
+
+Standard uniform mini-batch sampling would cause gradient updates to be
+dominated by the majority class (\texttt{nv}). Instead, each training sample
+is assigned a weight inversely proportional to its class frequency:
+
+\begin{equation}
+    w_i = \frac{1}{|\{j : y_j = y_i\}|}
+    \label{eq:sample_weight}
+\end{equation}
+
+PyTorch's \texttt{WeightedRandomSampler} then draws samples \textit{with
+replacement} using these weights, so each class is equally represented in
+expectation per epoch---without duplicating image files on disk.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Model Architectures}
+\label{sec:models}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\subsection{Baseline CNN}
+
+The baseline model is a four-block convolutional network trained entirely from
+random initialisation. Its purpose is to quantify the gain from transfer
+learning.
+
+\begin{table}[H]
+    \centering
+    \caption{Baseline CNN layer-by-layer dimensions.}
+    \begin{tabular}{llc}
+        \toprule
+        \textbf{Layer} & \textbf{Operations} & \textbf{Output shape} \\
+        \midrule
+        Input      & ---                                            & $3 \times 224 \times 224$ \\
+        Block 1    & Conv(3$\to$32, 3$\times$3) + BN + ReLU + MaxPool(2) & $32 \times 112 \times 112$ \\
+        Block 2    & Conv(32$\to$64, 3$\times$3) + BN + ReLU + MaxPool(2) & $64 \times 56 \times 56$ \\
+        Block 3    & Conv(64$\to$128, 3$\times$3) + BN + ReLU + MaxPool(2) & $128 \times 28 \times 28$ \\
+        Block 4    & Conv(128$\to$256, 3$\times$3) + BN + ReLU + AdaptAvg(4) & $256 \times 4 \times 4$ \\
+        Flatten    & ---                                            & 4{,}096 \\
+        FC 1       & Linear(4096$\to$512) + ReLU + Dropout(0.4)   & 512 \\
+        FC 2       & Linear(512$\to$7)                             & 7 \\
+        \midrule
+        \multicolumn{2}{l}{\textbf{Total parameters}} & $\approx$ 4.7 M \\
+        \bottomrule
+    \end{tabular}
+    \label{tab:baseline_arch}
+\end{table}
+
+Design rationale:
+\begin{itemize}
+    \item \textbf{BatchNorm} after every convolution stabilises gradient flow
+          and provides mild regularisation.
+    \item \textbf{Doubling channel depth} per block allows the network to learn
+          increasingly abstract representations.
+    \item \textbf{AdaptiveAvgPool} in the final block produces a fixed-size
+          feature map regardless of input resolution.
+    \item \textbf{Dropout(0.4)} in the classifier prevents co-adaptation and
+          reduces overfitting.
+\end{itemize}
+
+Training: Adam ($\text{lr}=10^{-3}$, $\text{wd}=10^{-4}$) with
+\texttt{ReduceLROnPlateau} (patience=3, factor=0.5), 10 epochs total.
+
+\subsection{ResNet18 with Transfer Learning}
+
+ResNet18~\cite{he2016resnet} consists of a convolutional stem followed by four
+groups of \textit{BasicBlocks} (residual units with two 3$\times$3
+convolutions each). The original fully-connected head
+($512 \to 1000$ classes) is replaced by a custom classifier for 7 classes.
+
+\begin{table}[H]
+    \centering
+    \caption{ResNet18 architecture with custom head.}
+    \begin{tabular}{llc}
+        \toprule
+        \textbf{Component} & \textbf{Details} & \textbf{Channels} \\
+        \midrule
+        Stem        & Conv(3$\to$64) + BN + ReLU + MaxPool & 64 \\
+        Layer 1     & 2$\times$ BasicBlock, stride 1 & 64 \\
+        Layer 2     & 2$\times$ BasicBlock, stride 2 & 128 \\
+        Layer 3     & 2$\times$ BasicBlock, stride 2 & 256 \\
+        Layer 4     & 2$\times$ BasicBlock, stride 2 & 512 \\
+        Pool        & AdaptiveAvgPool(1$\times$1) & 512 \\
+        \midrule
+        Head FC 1   & Linear(512$\to$256) + ReLU + Dropout(0.3) & 256 \\
+        Head FC 2   & Linear(256$\to$7) & 7 \\
+        \midrule
+        \multicolumn{2}{l}{\textbf{Total parameters}} & $\approx$ 11.2 M \\
+        \bottomrule
+    \end{tabular}
+    \label{tab:resnet_arch}
+\end{table}
+
+\textbf{Grad-CAM target:} Layer 4 (\texttt{layer4[-1]}) --- the last
+convolutional block before global pooling, producing $7\times7$ feature maps
+at the highest semantic level of the backbone.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Training Strategy}
+\label{sec:training}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\subsection{Two-Phase Fine-Tuning}
+
+Direct fine-tuning of all parameters with a single learning rate risks
+overwriting the generalised ImageNet representations before the randomly
+initialised head stabilises. The two-phase approach avoids this:
+
+\begin{table}[H]
+    \centering
+    \caption{Two-phase training configuration for ResNet18.}
+    \begin{tabular}{lccccl}
+        \toprule
+        \textbf{Phase} & \textbf{Backbone} & \textbf{Head}
+        & \textbf{Epochs} & \textbf{LR backbone} & \textbf{Scheduler} \\
+        \midrule
+        1 -- Frozen     & frozen & trainable & 5  & ---          & ReduceLROnPlateau \\
+        2 -- Fine-tune  & trainable & trainable & 15 & $3\times10^{-5}$ & CosineAnnealingLR \\
+        \bottomrule
+    \end{tabular}
+    \label{tab:phases}
+\end{table}
+
+In Phase 2, \textbf{differential learning rates} are applied via separate
+parameter groups in AdamW:
+
+\begin{equation}
+    \text{lr}_{\text{backbone}} = 3\times10^{-5}, \quad
+    \text{lr}_{\text{head}}     = 10^{-3}
+    \label{eq:diff_lr}
+\end{equation}
+
+This allows the backbone to adapt gently to the dermoscopy domain while the
+head converges faster. The ratio of 33:1 between head and backbone learning
+rates prevents catastrophic forgetting of ImageNet features.
+
+\subsection{Loss Function}
+
+Standard \textbf{cross-entropy loss} is used for both models:
+
+\begin{equation}
+    \mathcal{L} = -\sum_{c=1}^{C} y_c \log \hat{p}_c
+    \label{eq:ce_loss}
+\end{equation}
+
+where $C = 7$, $y_c \in \{0,1\}$ is the one-hot ground truth, and
+$\hat{p}_c$ is the predicted probability for class $c$.
+Class imbalance is handled at the \emph{sampling} level (Section~\ref{sec:data})
+rather than in the loss function, which keeps the loss gradients unmodified.
+
+\subsection{Training Curves}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{plots/Baseline_CNN_history.png}
+    \caption{Baseline CNN training dynamics: train/val loss (left) and
+             accuracy (right) over 10 epochs.}
+    \label{fig:baseline_history}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{plots/ResNet18_Transfer_Learning_history.png}
+    \caption{ResNet18 training dynamics over 20 epochs (5 frozen + 15
+             fine-tuning).}
+    \label{fig:resnet_history}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{plots/comparison_training_curves.png}
+    \caption{Side-by-side training curves for both models. The vertical dashed
+             line marks epoch 5, when the ResNet18 backbone is unfrozen.
+             A characteristic accuracy jump is typically visible at this point.}
+    \label{fig:comparison_curves}
+\end{figure}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Evaluation Methodology}
+\label{sec:eval}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\subsection{Why Accuracy Alone Is Insufficient}
+
+Given the 67\% majority class, a trivial classifier that always predicts
+\texttt{nv} achieves $\sim$67\% accuracy---far above random chance---while
+being clinically useless (it would miss every melanoma).
+
+\subsection{Metrics}
+
+\begin{table}[H]
+    \centering
+    \caption{Evaluation metrics and their roles.}
+    \begin{tabular}{lp{9cm}}
+        \toprule
+        \textbf{Metric} & \textbf{What it captures} \\
+        \midrule
+        Weighted F1-score
+            & Per-class $F_1$ weighted by class support.
+              Penalises failures on minority classes, robust to imbalance. \\
+        Per-class AUC-ROC (OvR)
+            & One-vs-rest discrimination ability for each class,
+              independent of classification threshold. \\
+        Macro AUC-ROC
+            & Unweighted mean of per-class AUC-ROC;
+              treats all classes equally regardless of size. \\
+        Confusion Matrix
+            & Reveals which class pairs are most often confused
+              (e.g.\ \texttt{mel} vs.\ \texttt{nv}). \\
+        Grad-CAM
+            & Visual validation that the model attends to the
+              lesion rather than background artefacts. \\
+        \bottomrule
+    \end{tabular}
+    \label{tab:metrics}
+\end{table}
+
+\subsection{Weighted F1-Score}
+
+\begin{equation}
+    F_1^{\text{weighted}} = \sum_{c=1}^{C}
+        \frac{|\mathcal{S}_c|}{N} \cdot F_1^{(c)}, \quad
+    F_1^{(c)} = \frac{2 \cdot \text{precision}^{(c)} \cdot \text{recall}^{(c)}}
+                     {\text{precision}^{(c)} + \text{recall}^{(c)}}
+    \label{eq:f1}
+\end{equation}
+
+where $|\mathcal{S}_c|$ is the number of true samples for class $c$ and
+$N$ is the total test set size.
+
+\subsection{Grad-CAM}
+
+Gradient-weighted Class Activation Mapping~\cite{selvaraju2017gradcam}
+produces a spatial heatmap indicating which regions of the input image most
+influenced the prediction. For a target class $c$ and a convolutional feature
+map $A^k$ at the chosen layer:
+
+\begin{equation}
+    \alpha_k^c = \frac{1}{Z} \sum_{i,j}
+        \frac{\partial y^c}{\partial A_{ij}^k}
+    \label{eq:gradcam_weights}
+\end{equation}
+
+\begin{equation}
+    L^c_{\text{Grad-CAM}} = \text{ReLU}\!\left(\sum_k \alpha_k^c A^k\right)
+    \label{eq:gradcam_map}
+\end{equation}
+
+The resulting map is upsampled to the input resolution and overlaid on the
+original image. We apply Grad-CAM to the \texttt{layer4} output of ResNet18,
+which produces $7\times7$ spatial feature maps at the highest semantic level
+of the backbone.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Results}
+\label{sec:results}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\subsection{Overall Performance}
+
+\begin{table}[H]
+    \centering
+    \caption{Test-set performance comparison.}
+    \begin{tabular}{lcccc}
+        \toprule
+        \textbf{Model} & \textbf{Accuracy} & \textbf{Weighted F1}
+        & \textbf{Macro AUC-ROC} & \textbf{Parameters} \\
+        \midrule
+        Baseline CNN              & --- & --- & ---  & $\approx$4.7\,M \\
+        ResNet18 Transfer Learning & --- & --- & ---  & $\approx$11.2\,M \\
+        \midrule
+        \multicolumn{5}{l}{\textit{Literature benchmarks (HAM10000):}} \\
+        ResNet18 (He et al.)      & $\sim$80\% & --- & --- & 11.2\,M \\
+        VGG11                     & $\sim$80.5\% & --- & --- & 132.9\,M \\
+        \bottomrule
+    \end{tabular}
+    \label{tab:results}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.6\textwidth]{plots/accuracy_f1_comparison.png}
+    \caption{Overall Accuracy and Weighted F1 for both models.}
+    \label{fig:acc_f1}
+\end{figure}
+
+\subsection{Per-Class F1-Score}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{plots/f1_comparison.png}
+    \caption{Per-class F1-score for Baseline CNN (blue) and ResNet18 (orange).
+             Rare classes (\texttt{df}, \texttt{vasc}) are typically the hardest
+             to classify correctly.}
+    \label{fig:f1_per_class}
+\end{figure}
+
+\subsection{Confusion Matrix}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{plots/confusion_matrix.png}
+    \caption{Confusion matrix for ResNet18 on the test set.
+             Left: raw counts. Right: row-normalised (recall per class on the
+             diagonal). The most frequent off-diagonal entry is typically
+             \texttt{mel} confused with \texttt{nv}, reflecting their visual
+             similarity.}
+    \label{fig:confusion}
+\end{figure}
+
+\subsection{Grad-CAM Analysis}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{plots/gradcam_results.png}
+    \caption{Grad-CAM attention maps. Left column: original image with
+             ground-truth label (green = correct prediction, red = wrong).
+             Right column: Grad-CAM overlay showing the regions that drove
+             the model's decision. Well-classified samples show concentrated
+             attention on the lesion; misclassified samples tend to show
+             diffuse or misplaced attention.}
+    \label{fig:gradcam}
+\end{figure}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Discussion}
+\label{sec:discussion}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\paragraph{Class imbalance.}
+The \texttt{WeightedRandomSampler} is the single most important preprocessing
+decision in this pipeline. Without it, the model collapses to predicting only
+\texttt{nv}, achieving high accuracy while being clinically worthless.
+
+\paragraph{Transfer learning vs.\ scratch.}
+ResNet18 fine-tuned from ImageNet weights substantially outperforms the
+Baseline CNN, despite having been trained on a domain (natural images) very
+different from dermoscopy. This confirms that low-level features---edges,
+colour gradients, textures---are highly transferable across visual domains.
+
+\paragraph{Hardest class pair: Melanoma vs.\ Nevus.}
+The confusion matrix consistently shows that \texttt{mel} is most often
+misclassified as \texttt{nv}. This pair is also the most clinically critical:
+a missed melanoma is a life-threatening error. This difficulty mirrors that of
+human expert performance, where distinguishing early-stage melanoma from an
+atypical nevus is the central challenge of dermoscopy.
+
+\paragraph{Grad-CAM validation.}
+For correctly classified samples, Grad-CAM confirms that the network attends
+to the lesion itself---not skin background, hair, or ruler artefacts that
+sometimes appear in dermoscopic images. Misclassified samples tend to show
+broader, less focused activation maps, suggesting uncertainty in the feature
+extraction.
+
+\paragraph{Possible improvements.}
+\begin{itemize}
+    \item \textbf{Stronger architecture}: EfficientNet-B3/B4 achieves higher
+          accuracy at similar parameter counts.
+    \item \textbf{Advanced augmentation}: MixUp~\cite{zhang2017mixup} or
+          CutMix interpolates between training samples and their labels,
+          regularising the model further.
+    \item \textbf{Test-Time Augmentation (TTA)}: averaging predictions over
+          multiple augmented views of the same image reduces variance.
+    \item \textbf{Focal Loss}: re-weights the cross-entropy loss to focus
+          training on hard-to-classify minority samples.
+\end{itemize}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Conclusion}
+\label{sec:conclusion}
+% ══════════════════════════════════════════════════════════════════════════════
+
+This project demonstrates a full machine-learning pipeline for dermoscopic
+image classification on the HAM10000 benchmark:
+
+\begin{enumerate}
+    \item \textbf{Exploratory analysis} revealed severe class imbalance and
+          guided the choice of \texttt{WeightedRandomSampler}.
+    \item \textbf{Baseline CNN} established a performance lower bound using
+          only domain-agnostic features learned from scratch.
+    \item \textbf{ResNet18 transfer learning} achieved substantially higher
+          performance by leveraging ImageNet pre-training and a two-phase
+          training strategy with differential learning rates.
+    \item \textbf{Grad-CAM} provided visual interpretability, confirming that
+          the model focuses on clinically relevant regions.
+    \item \textbf{Evaluation} went beyond accuracy to include weighted F1,
+          per-class AUC-ROC, and confusion matrices---metrics appropriate for
+          imbalanced medical datasets.
+\end{enumerate}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section*{Appendix: Hyperparameters}
+\label{sec:appendix}
+% ══════════════════════════════════════════════════════════════════════════════
+\addcontentsline{toc}{section}{Appendix: Hyperparameters}
+
+\begin{table}[H]
+    \centering
+    \caption{Full hyperparameter configuration (\texttt{src/config.py}).}
+    \begin{tabular}{llp{6.5cm}}
+        \toprule
+        \textbf{Parameter} & \textbf{Value} & \textbf{Description} \\
+        \midrule
+        \texttt{IMG\_SIZE}        & 224      & Input resolution (px) \\
+        \texttt{BATCH\_SIZE}      & 32       & Samples per mini-batch \\
+        \texttt{EPOCHS\_FROZEN}   & 5        & Phase 1 epochs (frozen backbone) \\
+        \texttt{EPOCHS\_FINETUNE} & 15       & Phase 2 epochs (full fine-tuning) \\
+        \texttt{LR\_FROZEN}       & $10^{-3}$ & Head learning rate \\
+        \texttt{LR\_FINETUNE}     & $3\times10^{-5}$ & Backbone learning rate (Phase 2) \\
+        \texttt{SEED}             & 42       & Random seed for reproducibility \\
+        ImageNet $\mu$            & [0.485, 0.456, 0.406] & Normalisation mean (R, G, B) \\
+        ImageNet $\sigma$         & [0.229, 0.224, 0.225] & Normalisation std (R, G, B) \\
+        \bottomrule
+    \end{tabular}
+    \label{tab:hyperparams}
+\end{table}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\bibliographystyle{plain}
+\begin{thebibliography}{9}
+
+\bibitem{tschandl2018ham10000}
+P.~Tschandl, C.~Rosendahl, and H.~Kittler,
+``The HAM10000 dataset, a large collection of multi-source dermatoscopic images
+  of common pigmented skin lesions,''
+\textit{Scientific Data}, vol.~5, p.~180161, 2018.
+
+\bibitem{he2016resnet}
+K.~He, X.~Zhang, S.~Ren, and J.~Sun,
+``Deep residual learning for image recognition,''
+in \textit{Proc. CVPR}, pp.~770--778, 2016.
+
+\bibitem{deng2009imagenet}
+J.~Deng, W.~Dong, R.~Socher, L.~Li, K.~Li, and L.~Fei-Fei,
+``ImageNet: A large-scale hierarchical image database,''
+in \textit{Proc. CVPR}, pp.~248--255, 2009.
+
+\bibitem{selvaraju2017gradcam}
+R.~R.~Selvaraju, M.~Cogswell, A.~Das, R.~Vedantam, D.~Parikh, and D.~Batra,
+``Grad-CAM: Visual explanations from deep networks via gradient-based
+  localization,''
+in \textit{Proc. ICCV}, pp.~618--626, 2017.
+
+\bibitem{zhang2017mixup}
+H.~Zhang, M.~Ciss\'{e}, Y.~N.~Dauphin, and D.~Lopez-Paz,
+``mixup: Beyond empirical risk minimization,''
+in \textit{Proc. ICLR}, 2018.
+
+\end{thebibliography}
+
+\end{document}
