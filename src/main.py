@@ -2,6 +2,9 @@ import os
 import random
 import sys
 
+# Ensure src/ is on the path regardless of the working directory
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -115,5 +118,4 @@ def main():
 
 
 if __name__ == '__main__':
-    sys.path.insert(0, os.path.dirname(__file__))
     main()

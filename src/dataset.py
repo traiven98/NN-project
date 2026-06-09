@@ -55,13 +55,23 @@ def split_data(df: pd.DataFrame):
             .rename(columns={'label': 'lesion_label'})
         )
 
+        # Stratification requires >= 2 lesions per class.
+        # If any class has only 1 lesion after path filtering, fall back to
+        # non-stratified split to avoid a ValueError from sklearn.
+        min_lesions_per_class = lesion_df['lesion_label'].value_counts().min()
+        stratify_col = lesion_df['lesion_label'] if min_lesions_per_class >= 2 else None
+        if stratify_col is None:
+            print('Warning: some class has <2 unique lesions; '
+                  'falling back to non-stratified lesion split.')
+
         train_lesions, temp_lesions = train_test_split(
             lesion_df, test_size=0.30,
-            stratify=lesion_df['lesion_label'], random_state=SEED,
+            stratify=stratify_col, random_state=SEED,
         )
+        stratify_temp = temp_lesions['lesion_label'] if stratify_col is not None else None
         val_lesions, test_lesions = train_test_split(
             temp_lesions, test_size=0.50,
-            stratify=temp_lesions['lesion_label'], random_state=SEED,
+            stratify=stratify_temp, random_state=SEED,
         )
 
         train_df = df[df['lesion_id'].isin(train_lesions['lesion_id'])]
