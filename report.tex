@@ -73,9 +73,19 @@
     {\large HAM10000 Dataset\par}
 
     \vspace{2cm}
-    {\large Neural Networks Course\par}
-    \vspace{0.5cm}
-    {\large\the\year\par}
+
+    {\large
+    \begin{tabular}{c}
+        Your Name \\[0.2em]
+        \texttt{your.email@university.edu}
+    \end{tabular}\par}
+
+    \vspace{1.2cm}
+    {\normalsize Neural Networks Course\par}
+    \vspace{0.3cm}
+    {\normalsize University Name\par}
+    \vspace{0.3cm}
+    {\normalsize\the\year\par}
 
     \vfill
     \begin{abstract}
@@ -208,8 +218,30 @@ proportions in every subset:
     \label{eq:split}
 \end{equation}
 
-Stratification is essential here---random splitting on an imbalanced dataset
-could leave rare classes with zero samples in the test set.
+\paragraph{Lesion-level split.}
+HAM10000 contains a \texttt{lesion\_id} field: multiple images can depict the
+\emph{same} physical lesion photographed at slightly different angles or under
+different dermoscopes.
+A naive image-level split would allow the same lesion to appear in both the
+training and the test set, artificially inflating evaluation metrics---this is
+a form of data leakage.
+To prevent it, the split is performed at the \textbf{lesion level}: all images
+sharing a \texttt{lesion\_id} are assigned to the same subset.
+Class proportions are still preserved by stratifying on each lesion's
+majority-vote label before splitting.
+
+\paragraph{WeightedRandomSampler scope.}
+The per-class sampling weights (Equation~\ref{eq:sample_weight}) are computed
+\emph{exclusively} from the training subset after the split is complete.
+No information from the validation or test sets influences the sampler,
+so there is no leakage through the sampling weights.
+
+\paragraph{Best-model checkpointing.}
+During training, the model state is saved to disk every time the validation
+accuracy improves.
+Final evaluation always loads the \emph{best} checkpoint, not the weights
+from the last epoch, avoiding the scenario where the model overfits in the
+final epochs.
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Data Preparation}

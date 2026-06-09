@@ -36,12 +36,51 @@ def load_dataframe() -> pd.DataFrame:
 
 
 def split_data(df: pd.DataFrame):
-    train_df, temp_df = train_test_split(
-        df, test_size=0.30, stratify=df['label'], random_state=SEED
-    )
-    val_df, test_df = train_test_split(
-        temp_df, test_size=0.50, stratify=temp_df['label'], random_state=SEED
-    )
+    """Stratified 70/15/15 split.
+
+    If the DataFrame contains a 'lesion_id' column (present in HAM10000),
+    the split is performed at the *lesion* level so that all images of the
+    same lesion end up in the same subset.  This prevents the same physical
+    lesion from appearing in both train and test, which would artificially
+    inflate evaluation metrics.
+
+    Falls back to image-level stratified split when 'lesion_id' is absent.
+    """
+    if 'lesion_id' in df.columns:
+        # One row per lesion, keeping the majority class label for stratification
+        lesion_df = (
+            df.groupby('lesion_id')['label']
+            .agg(lambda x: x.value_counts().index[0])
+            .reset_index()
+            .rename(columns={'label': 'lesion_label'})
+        )
+
+        train_lesions, temp_lesions = train_test_split(
+            lesion_df, test_size=0.30,
+            stratify=lesion_df['lesion_label'], random_state=SEED,
+        )
+        val_lesions, test_lesions = train_test_split(
+            temp_lesions, test_size=0.50,
+            stratify=temp_lesions['lesion_label'], random_state=SEED,
+        )
+
+        train_df = df[df['lesion_id'].isin(train_lesions['lesion_id'])]
+        val_df   = df[df['lesion_id'].isin(val_lesions['lesion_id'])]
+        test_df  = df[df['lesion_id'].isin(test_lesions['lesion_id'])]
+
+        print(f'Split by lesion_id — '
+              f'Train: {len(train_df)} | Val: {len(val_df)} | Test: {len(test_df)}')
+    else:
+        # Fallback: image-level stratified split
+        train_df, temp_df = train_test_split(
+            df, test_size=0.30, stratify=df['label'], random_state=SEED,
+        )
+        val_df, test_df = train_test_split(
+            temp_df, test_size=0.50, stratify=temp_df['label'], random_state=SEED,
+        )
+        print(f'Split by image (no lesion_id found) — '
+              f'Train: {len(train_df)} | Val: {len(val_df)} | Test: {len(test_df)}')
+
     return (
         train_df.reset_index(drop=True),
         val_df.reset_index(drop=True),
