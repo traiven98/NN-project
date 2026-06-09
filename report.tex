@@ -3,7 +3,7 @@
 % ── Packages ──────────────────────────────────────────────────────────────────
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
-\usepackage[english]{babel}
+\usepackage[czech]{babel}
 \usepackage{geometry}
 \geometry{margin=2.5cm}
 
@@ -45,7 +45,7 @@
 % ── Header / footer ───────────────────────────────────────────────────────────
 \pagestyle{fancy}
 \fancyhf{}
-\rhead{Skin Lesion Classification -- HAM10000}
+\rhead{Klasifikace kožních lézí -- HAM10000}
 \lhead{\leftmark}
 \rfoot{\thepage}
 
@@ -65,44 +65,34 @@
     \centering
     \vspace*{2cm}
 
-    {\LARGE\bfseries Skin Lesion Classification\\[0.4em]
-    Using Convolutional Neural Networks\\[0.4em]
-    and Transfer Learning\par}
-
+    {\LARGE\bfseries Klasifikace kožních lézí\\[0.4em]
+    pomocí konvolučních neuronových sítí\\[0.4em]
+    a přenosového učení\par}
     \vspace{1.5cm}
-    {\large HAM10000 Dataset\par}
+{\large
+\begin{tabular}{c}
+ Kyryl Serediuk,\quad Evgeniia Volkova \\[0.2em]
+\end{tabular}\par}
 
-    \vspace{2cm}
-
-    {\large
-    \begin{tabular}{c}
-        Your Name \\[0.2em]
-        \texttt{your.email@university.edu}
-    \end{tabular}\par}
-
-    \vspace{1.2cm}
-    {\normalsize Neural Networks Course\par}
-    \vspace{0.3cm}
-    {\normalsize University Name\par}
-    \vspace{0.3cm}
-    {\normalsize\the\year\par}
-
+{\normalsize Neuronové sítě \par}
     \vfill
     \begin{abstract}
         \noindent
-        This report presents a supervised multi-class classification system for
-        dermoscopic skin lesion images using the HAM10000 dataset (10{,}015
-        images, 7 classes). We compare two architectures: a four-layer
-        \textbf{Baseline CNN} trained from scratch and a \textbf{ResNet18}
-        fine-tuned from ImageNet weights using a two-phase training strategy.
-        The primary challenge is severe class imbalance---\textit{Melanocytic
-        nevus} constitutes 67\% of all samples---addressed via
-        \texttt{WeightedRandomSampler}. Models are evaluated using weighted
-        F1-score, per-class AUC-ROC, and Grad-CAM attention maps.
-        Transfer learning outperforms the baseline by a significant margin:
-        ResNet18 achieves 77.30\% accuracy and 0.9495 macro AUC-ROC, compared
-        to 59.72\% accuracy for the Baseline CNN, consistent with the
-        literature benchmark of $\sim$80\% accuracy for ResNet18 on this dataset.
+        Tato zpráva představuje systém supervizované vícetrídní klasifikace
+        dermatoskopických snímků kožních lézí s využitím datasetu HAM10000
+        (10\,015 snímků, 7 tříd). Porovnáváme dvě architektury: čtyřvrstvou
+        \textbf{základní CNN} trénovanou od nuly a \textbf{ResNet18}
+        jemně doladěnou z vah ImageNet pomocí dvou-fázové tréninkové strategie.
+        Hlavní výzvou je výrazná nerovnováha tříd ---
+        \textit{Melanocytární névus} tvoří 67\,\% všech vzorků ---
+        řešená pomocí \texttt{WeightedRandomSampler}. Modely jsou hodnoceny
+        pomocí váženého F1-skóre, AUC-ROC pro jednotlivé třídy
+        a vizualizačních map Grad-CAM.
+        Přenosové učení výrazně překonalo základní linii:
+        ResNet18 dosáhlo přesnosti 77{,}30\,\% a makro AUC-ROC 0{,}9495,
+        ve srovnání s 59{,}72\,\% přesnosti základní CNN,
+        v souladu s referenční hodnotou $\sim$80\,\% přesnosti ResNet18
+        na tomto datasetu.
     \end{abstract}
 \end{titlepage}
 
@@ -110,30 +100,32 @@
 \newpage
 
 % ══════════════════════════════════════════════════════════════════════════════
-\section{Introduction}
+\section{Úvod}
 \label{sec:intro}
 % ══════════════════════════════════════════════════════════════════════════════
 
-Skin cancer is one of the most prevalent cancers worldwide. Dermoscopy---a
-non-invasive imaging technique that allows magnified visualisation of skin
-structures---significantly improves early detection rates when used by trained
-dermatologists. However, accurate interpretation of dermoscopic images is
-highly expert-dependent, time-consuming, and subject to inter-observer
-variability.
+Rakovina kůže patří mezi nejrozšířenější nádorová onemocnění na celém světě.
+Dermatoskopie --- neinvazivní zobrazovací technika umožňující zvětšené
+zobrazení kožních struktur --- výrazně zlepšuje míru včasného záchytu,
+je-li prováděna vyškolenými dermatology. Přesná interpretace dermatoskopických
+snímků je však vysoce závislá na odbornosti lékaře, časově náročná
+a podléhá mezipozorovatelské variabilitě.
 
-The goal of this project is to build an automated classifier that assigns a
-dermoscopic image to one of seven diagnostic categories spanning benign,
-pre-cancerous, and malignant lesions. The task is framed as
-\textbf{supervised multi-class image classification}, with ground-truth labels
-confirmed through histopathology, clinical follow-up, or expert consensus.
+Cílem tohoto projektu je vytvořit automatický klasifikátor, který přiřadí
+dermatoskopický snímek do jedné ze sedmi diagnostických kategorií
+zahrnujících benigní, prekancerózní a maligní léze. Úloha je formulována
+jako \textbf{supervizovaná vícetrídní klasifikace obrázků}, přičemž
+referenční štítky jsou potvrzeny histopatologií, klinickým sledováním
+nebo expertním konsenzem.
 
-Two models are compared:
+Jsou porovnávány dva modely:
 \begin{itemize}
-    \item \textbf{Baseline CNN}: a four-block convolutional network trained
-          entirely from random initialisation, establishing a performance lower bound.
-    \item \textbf{ResNet18 Transfer Learning}: a residual network pre-trained on
-          ImageNet~\cite{deng2009imagenet} and fine-tuned on HAM10000 using a
-          two-phase strategy with differential learning rates.
+    \item \textbf{Základní CNN}: čtyřbloková konvoluční síť trénovaná
+          výhradně z náhodné inicializace, stanovující dolní hranici výkonu.
+    \item \textbf{ResNet18 s přenosovým učením}: reziduální síť
+          předtrénovaná na ImageNet~\cite{deng2009imagenet}
+          a jemně doladěná na HAM10000 pomocí dvou-fázové strategie
+          s diferenciálními rychlostmi učení.
 \end{itemize}
 
 % ══════════════════════════════════════════════════════════════════════════════
@@ -141,380 +133,380 @@ Two models are compared:
 \label{sec:dataset}
 % ══════════════════════════════════════════════════════════════════════════════
 
-\subsection{HAM10000 Overview}
+\subsection{Přehled HAM10000}
 
-The \textbf{HAM10000} dataset~\cite{tschandl2018ham10000} (``Human Against
-Machine with 10,000 training images'') was collected over 20 years from two
-clinical sources: the Medical University of Vienna and a clinic in Queensland,
-Australia. It was the official benchmark dataset of the ISIC 2018 challenge.
+Dataset \textbf{HAM10000}~\cite{tschandl2018ham10000}
+(„Human Against Machine with 10\,000 training images") byl sbírán po dobu
+20 let ze dvou klinických zdrojů: Lékařské univerzity ve Vídni a kliniky
+v Queenslandu v Austrálii. Byl oficiálním referenčním datasetem výzvy
+ISIC 2018.
 
 \begin{table}[H]
     \centering
-    \caption{HAM10000 dataset properties.}
+    \caption{Vlastnosti datasetu HAM10000.}
     \begin{tabular}{ll}
         \toprule
-        \textbf{Property} & \textbf{Value} \\
+        \textbf{Vlastnost} & \textbf{Hodnota} \\
         \midrule
-        Total images & 10{,}015 \\
-        Original resolution & 450 $\times$ 600 px \\
-        Model input size & 224 $\times$ 224 px \\
-        Number of classes & 7 \\
-        Label confirmation & histopathology, follow-up, consensus, confocal \\
+        Celkový počet snímků & 10\,015 \\
+        Původní rozlišení & 450 $\times$ 600 px \\
+        Vstupní velikost modelu & 224 $\times$ 224 px \\
+        Počet tříd & 7 \\
+        Potvrzení štítků & histopatologie, sledování, konsenzus, konfokální mikroskopie \\
         \bottomrule
     \end{tabular}
     \label{tab:dataset}
 \end{table}
 
-\subsection{Class Descriptions}
+\subsection{Popis tříd}
 
 \begin{table}[H]
     \centering
-    \caption{Class distribution in HAM10000.}
+    \caption{Distribuce tříd v datasetu HAM10000.}
     \begin{tabular}{llccc}
         \toprule
-        \textbf{Code} & \textbf{Full Name} & \textbf{Type} &
-        \textbf{Count} & \textbf{\%} \\
+        \textbf{Kód} & \textbf{Celý název} & \textbf{Typ} &
+        \textbf{Počet} & \textbf{\%} \\
         \midrule
-        \texttt{nv}    & Melanocytic nevus       & Benign        & 6{,}705 & 66.9 \\
-        \texttt{mel}   & Melanoma                & Malignant     & 1{,}113 & 11.1 \\
-        \texttt{bkl}   & Benign keratosis        & Benign        & 1{,}099 & 11.0 \\
-        \texttt{bcc}   & Basal cell carcinoma    & Malignant     &   514   &  5.1 \\
-        \texttt{akiec} & Actinic keratosis       & Pre-cancerous &   327   &  3.3 \\
-        \texttt{vasc}  & Vascular lesion         & Benign        &   142   &  1.4 \\
-        \texttt{df}    & Dermatofibroma          & Benign        &   115   &  1.1 \\
+        \texttt{nv}    & Melanocytární névus      & Benigní        & 6\,705 & 66{,}9 \\
+        \texttt{mel}   & Melanom                  & Maligní        & 1\,113 & 11{,}1 \\
+        \texttt{bkl}   & Benigní keratóza         & Benigní        & 1\,099 & 11{,}0 \\
+        \texttt{bcc}   & Bazocelulární karcinom   & Maligní        &   514  &  5{,}1 \\
+        \texttt{akiec} & Aktinická keratóza       & Prekancerózní  &   327  &  3{,}3 \\
+        \texttt{vasc}  & Vaskulární léze          & Benigní        &   142  &  1{,}4 \\
+        \texttt{df}    & Dermatofibrom            & Benigní        &   115  &  1{,}1 \\
         \midrule
-        & \textbf{Total} & & \textbf{10{,}015} & \textbf{100.0} \\
+        & \textbf{Celkem} & & \textbf{10\,015} & \textbf{100{,}0} \\
         \bottomrule
     \end{tabular}
     \label{tab:classes}
 \end{table}
 
-\subsection{Class Imbalance}
+\subsection{Nerovnováha tříd}
 
-The dataset exhibits \textbf{severe class imbalance}: \textit{Melanocytic
-nevus} (\texttt{nv}) constitutes 66.9\% of all samples, while
-\textit{Dermatofibroma} (\texttt{df}) and \textit{Vascular lesion}
-(\texttt{vasc}) together account for only 2.5\%. A naive classifier that
-always predicts \texttt{nv} achieves $\sim$67\% top-1 accuracy while
-producing zero useful predictions for any other class---making accuracy alone
-a misleading metric for this task.
+Dataset vykazuje \textbf{výraznou nerovnováhu tříd}: \textit{Melanocytární
+névus} (\texttt{nv}) tvoří 66{,}9\,\% všech vzorků, zatímco
+\textit{Dermatofibrom} (\texttt{df}) a \textit{Vaskulární léze}
+(\texttt{vasc}) dohromady tvoří pouhých 2{,}5\,\%. Triviální klasifikátor,
+který vždy predikuje \texttt{nv}, dosahuje $\sim$67\,\% přesnosti,
+přičemž neposkytuje žádné užitečné předpovědi pro žádnou jinou třídu ---
+to činí přesnost samotnou zavádějícím metrikem pro tuto úlohu.
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{plots/class_distribution.png}
-    \caption{Class distribution in HAM10000. Left: absolute counts per class.
-             Right: percentage breakdown. The dominance of \texttt{nv} (67\%)
-             motivates the use of \texttt{WeightedRandomSampler} during training.}
+    \caption{Distribuce tříd v datasetu HAM10000. Vlevo: absolutní počty
+             na třídu. Vpravo: procentuální rozložení. Dominance třídy
+             \texttt{nv} (67\,\%) motivuje použití
+             \texttt{WeightedRandomSampler} během tréninku.}
     \label{fig:class_dist}
 \end{figure}
 
-\subsection{Data Split}
+\subsection{Rozdělení dat}
 
-The dataset is divided using \textbf{stratified sampling} to preserve class
-proportions in every subset:
+Dataset je rozdělen pomocí \textbf{stratifikovaného vzorkování na úrovni lézí},
+aby byly zachovány proporce tříd v každé podmnožině a zároveň bylo zabráněno
+úniku dat:
 
 \begin{equation}
-    \text{Train} : \text{Val} : \text{Test} = 70\% : 15\% : 15\%
-    \quad \Rightarrow \quad 6{,}981 : 1{,}532 : 1{,}502
+    \text{Train} : \text{Val} : \text{Test} = 70\,\% : 15\,\% : 15\,\%
+    \quad \Rightarrow \quad 6\,981 : 1\,532 : 1\,502
     \label{eq:split}
 \end{equation}
 
-\paragraph{Lesion-level split.}
-HAM10000 contains a \texttt{lesion\_id} field: multiple images can depict the
-\emph{same} physical lesion photographed at slightly different angles or under
-different dermoscopes.
-A naive image-level split would allow the same lesion to appear in both the
-training and the test set, artificially inflating evaluation metrics---this is
-a form of data leakage.
-To prevent it, the split is performed at the \textbf{lesion level}: all images
-sharing a \texttt{lesion\_id} are assigned to the same subset.
-Class proportions are still preserved by stratifying on each lesion's
-majority-vote label before splitting.
+\paragraph{Rozdělení na úrovni lézí.}
+HAM10000 obsahuje pole \texttt{lesion\_id}: více snímků může zobrazovat
+\emph{stejnou} fyzickou lézi. Naivní rozdělení na úrovni snímků by umožnilo,
+aby se stejná léze objevila v trénovací i testovací sadě, čímž by se
+artificálně nadhodnotily evaluační metriky --- jedná se o formu úniku dat.
+Aby se tomu zabránilo, je rozdělení provedeno na \textbf{úrovni lézí}:
+všechny snímky sdílející \texttt{lesion\_id} jsou přiřazeny do stejné podmnožiny.
 
-\paragraph{WeightedRandomSampler scope.}
-The per-class sampling weights (Equation~\ref{eq:sample_weight}) are computed
-\emph{exclusively} from the training subset after the split is complete.
-No information from the validation or test sets influences the sampler,
-so there is no leakage through the sampling weights.
+\paragraph{Rozsah WeightedRandomSampler.}
+Váhy vzorkování na třídu jsou vypočítány \emph{výhradně} z trénovací podmnožiny
+po dokončení rozdělení. Žádná informace z validační nebo testovací sady
+neovlivňuje vzorkovač, takže nedochází k úniku dat prostřednictvím vah.
 
-\paragraph{Best-model checkpointing.}
-During training, the model state is saved to disk every time the validation
-accuracy improves.
-Final evaluation always loads the \emph{best} checkpoint, not the weights
-from the last epoch, avoiding the scenario where the model overfits in the
-final epochs.
+\paragraph{Ukládání nejlepšího modelu.}
+Během tréninku je stav modelu uložen na disk pokaždé, když se zlepší validační
+přesnost. Finální hodnocení vždy načte \emph{nejlepší} checkpoint, nikoli váhy
+z poslední epochy.
 
 % ══════════════════════════════════════════════════════════════════════════════
-\section{Data Preparation}
+\section{Příprava dat}
 \label{sec:data}
 % ══════════════════════════════════════════════════════════════════════════════
 
-\subsection{Data Augmentation}
+\subsection{Augmentace dat}
 
-Augmentation is applied \textit{only} to the training set. The validation and
-test sets receive only resizing and normalisation to ensure unbiased evaluation.
+Augmentace je aplikována \textit{pouze} na trénovací sadu. Validační
+a testovací sady obdrží pouze změnu velikosti a normalizaci, aby bylo
+zajištěno nezkreslené hodnocení.
 
 \begin{table}[H]
     \centering
-    \caption{Transforms applied per split.}
+    \caption{Transformace aplikované podle sady.}
     \begin{tabular}{lccp{6cm}}
         \toprule
-        \textbf{Transform} & \textbf{Train} & \textbf{Val/Test}
-        & \textbf{Rationale} \\
+        \textbf{Transformace} & \textbf{Train} & \textbf{Val/Test}
+        & \textbf{Zdůvodnění} \\
         \midrule
         Resize(224$\times$224) & \checkmark & \checkmark
-            & Required input size for ResNet18 \\
+            & Požadovaný vstupní rozměr pro ResNet18 \\
         RandomHorizontalFlip   & \checkmark & --
-            & Lesions have no natural orientation \\
+            & Léze nemají přirozený směr \\
         RandomVerticalFlip     & \checkmark & --
-            & Same as horizontal flip \\
+            & Stejné jako horizontální otočení \\
         RandomRotation(20°)    & \checkmark & --
-            & Rotation-invariant appearance \\
-        ColorJitter($b$=0.2, $c$=0.2, $s$=0.2, $h$=0.1) & \checkmark & --
-            & Simulates camera and lighting variation across clinics \\
+            & Vzhled invariantní vůči rotaci \\
+        ColorJitter($b$=0{,}2, $c$=0{,}2, $s$=0{,}2, $h$=0{,}1) & \checkmark & --
+            & Simuluje variaci kamery a osvětlení mezi klinikami \\
         Normalize(ImageNet $\mu$/$\sigma$) & \checkmark & \checkmark
-            & Matches distribution expected by pretrained backbone \\
+            & Odpovídá distribuci očekávané předtrénovanou páteří \\
         \bottomrule
     \end{tabular}
     \label{tab:transforms}
 \end{table}
 
-\subsection{Handling Class Imbalance: WeightedRandomSampler}
+\subsection{Řešení nerovnováhy tříd: WeightedRandomSampler}
 
-Standard uniform mini-batch sampling would cause gradient updates to be
-dominated by the majority class (\texttt{nv}). Instead, each training sample
-is assigned a weight inversely proportional to its class frequency:
+Standardní uniformní vzorkování mini-dávek by způsobilo, že gradientové
+aktualizace budou dominovány většinovou třídou (\texttt{nv}). Místo toho
+je každému trénovacímu vzorku přiřazena váha nepřímo úměrná frekvenci
+jeho třídy:
 
 \begin{equation}
     w_i = \frac{1}{|\{j : y_j = y_i\}|}
     \label{eq:sample_weight}
 \end{equation}
 
-PyTorch's \texttt{WeightedRandomSampler} then draws samples \textit{with
-replacement} using these weights, so each class is equally represented in
-expectation per epoch---without duplicating image files on disk.
+PyTorchův \texttt{WeightedRandomSampler} pak vzorkuje \textit{s opakováním}
+pomocí těchto vah, takže každá třída je v průměru na epochu zastoupena
+stejně --- bez duplikování souborů obrázků na disku.
 
 % ══════════════════════════════════════════════════════════════════════════════
-\section{Model Architectures}
+\section{Architektury modelů}
 \label{sec:models}
 % ══════════════════════════════════════════════════════════════════════════════
 
-\subsection{Baseline CNN}
+\subsection{Základní CNN}
 
-The baseline model is a four-block convolutional network trained entirely from
-random initialisation. Its purpose is to quantify the gain from transfer
-learning.
+Základní model je čtyřbloková konvoluční síť trénovaná výhradně z náhodné
+inicializace. Jejím účelem je kvantifikovat přínos přenosového učení.
 
 \begin{table}[H]
     \centering
-    \caption{Baseline CNN layer-by-layer dimensions.}
+    \caption{Rozměry vrstev základní CNN.}
     \begin{tabular}{llc}
         \toprule
-        \textbf{Layer} & \textbf{Operations} & \textbf{Output shape} \\
+        \textbf{Vrstva} & \textbf{Operace} & \textbf{Výstupní tvar} \\
         \midrule
-        Input      & ---                                            & $3 \times 224 \times 224$ \\
-        Block 1    & Conv(3$\to$32, 3$\times$3) + BN + ReLU + MaxPool(2) & $32 \times 112 \times 112$ \\
-        Block 2    & Conv(32$\to$64, 3$\times$3) + BN + ReLU + MaxPool(2) & $64 \times 56 \times 56$ \\
-        Block 3    & Conv(64$\to$128, 3$\times$3) + BN + ReLU + MaxPool(2) & $128 \times 28 \times 28$ \\
-        Block 4    & Conv(128$\to$256, 3$\times$3) + BN + ReLU + AdaptAvg(4) & $256 \times 4 \times 4$ \\
-        Flatten    & ---                                            & 4{,}096 \\
-        FC 1       & Linear(4096$\to$512) + ReLU + Dropout(0.4)   & 512 \\
-        FC 2       & Linear(512$\to$7)                             & 7 \\
+        Vstup   & ---                                                        & $3 \times 224 \times 224$ \\
+        Blok 1  & Conv(3$\to$32, 3$\times$3) + BN + ReLU + MaxPool(2)       & $32 \times 112 \times 112$ \\
+        Blok 2  & Conv(32$\to$64, 3$\times$3) + BN + ReLU + MaxPool(2)      & $64 \times 56 \times 56$ \\
+        Blok 3  & Conv(64$\to$128, 3$\times$3) + BN + ReLU + MaxPool(2)     & $128 \times 28 \times 28$ \\
+        Blok 4  & Conv(128$\to$256, 3$\times$3) + BN + ReLU + AdaptAvg(4)   & $256 \times 4 \times 4$ \\
+        Flatten & ---                                                        & 4\,096 \\
+        FC 1    & Linear(4096$\to$512) + ReLU + Dropout(0{,}4)              & 512 \\
+        FC 2    & Linear(512$\to$7)                                         & 7 \\
         \midrule
-        \multicolumn{2}{l}{\textbf{Total parameters}} & $\approx$ 2.5 M \\
+        \multicolumn{2}{l}{\textbf{Celkem parametrů}} & $\approx$ 2{,}5\,M \\
         \bottomrule
     \end{tabular}
     \label{tab:baseline_arch}
 \end{table}
 
-Design rationale:
+Zdůvodnění návrhu:
 \begin{itemize}
-    \item \textbf{BatchNorm} after every convolution stabilises gradient flow
-          and provides mild regularisation.
-    \item \textbf{Doubling channel depth} per block allows the network to learn
-          increasingly abstract representations.
-    \item \textbf{AdaptiveAvgPool} in the final block produces a fixed-size
-          feature map regardless of input resolution.
-    \item \textbf{Dropout(0.4)} in the classifier prevents co-adaptation and
-          reduces overfitting.
+    \item \textbf{BatchNorm} po každé konvoluci stabilizuje tok gradientů
+          a poskytuje mírnou regularizaci.
+    \item \textbf{Zdvojení počtu kanálů} v každém bloku umožňuje síti učit se
+          stále abstraktnější reprezentace.
+    \item \textbf{AdaptiveAvgPool} v posledním bloku produkuje mapu příznaků
+          pevné velikosti bez ohledu na vstupní rozlišení.
+    \item \textbf{Dropout(0{,}4)} v klasifikátoru zabraňuje ko-adaptaci
+          a snižuje přeučení.
 \end{itemize}
 
-Training: Adam ($\text{lr}=10^{-3}$, $\text{wd}=10^{-4}$) with
-\texttt{ReduceLROnPlateau} (patience=3, factor=0.5), 10 epochs total.
+Trénink: Adam ($\text{lr}=10^{-3}$, $\text{wd}=10^{-4}$) s
+\texttt{ReduceLROnPlateau} (patience=3, factor=0{,}5), celkem 10 epoch.
 
-\subsection{ResNet18 with Transfer Learning}
+\subsection{ResNet18 s přenosovým učením}
 
-ResNet18~\cite{he2016resnet} consists of a convolutional stem followed by four
-groups of \textit{BasicBlocks} (residual units with two 3$\times$3
-convolutions each). The original fully-connected head
-($512 \to 1000$ classes) is replaced by a custom classifier for 7 classes.
+ResNet18~\cite{he2016resnet} se skládá z konvoluční kmenové části
+následované čtyřmi skupinami \textit{BasicBlocks} (reziduální jednotky
+se dvěma konvolucemi 3$\times$3). Původní plně propojená hlavička
+($512 \to 1000$ tříd) je nahrazena vlastním klasifikátorem pro 7 tříd.
 
 \begin{table}[H]
     \centering
-    \caption{ResNet18 architecture with custom head.}
+    \caption{Architektura ResNet18 s vlastní hlavičkou.}
     \begin{tabular}{llc}
         \toprule
-        \textbf{Component} & \textbf{Details} & \textbf{Channels} \\
+        \textbf{Komponenta} & \textbf{Detaily} & \textbf{Kanály} \\
         \midrule
-        Stem        & Conv(3$\to$64) + BN + ReLU + MaxPool & 64 \\
-        Layer 1     & 2$\times$ BasicBlock, stride 1 & 64 \\
-        Layer 2     & 2$\times$ BasicBlock, stride 2 & 128 \\
-        Layer 3     & 2$\times$ BasicBlock, stride 2 & 256 \\
-        Layer 4     & 2$\times$ BasicBlock, stride 2 & 512 \\
-        Pool        & AdaptiveAvgPool(1$\times$1) & 512 \\
+        Kmen      & Conv(3$\to$64) + BN + ReLU + MaxPool & 64 \\
+        Vrstva 1  & 2$\times$ BasicBlock, stride 1 & 64 \\
+        Vrstva 2  & 2$\times$ BasicBlock, stride 2 & 128 \\
+        Vrstva 3  & 2$\times$ BasicBlock, stride 2 & 256 \\
+        Vrstva 4  & 2$\times$ BasicBlock, stride 2 & 512 \\
+        Pool      & AdaptiveAvgPool(1$\times$1) & 512 \\
         \midrule
-        Head FC 1   & Linear(512$\to$256) + ReLU + Dropout(0.3) & 256 \\
-        Head FC 2   & Linear(256$\to$7) & 7 \\
+        Head FC 1 & Linear(512$\to$256) + ReLU + Dropout(0{,}3) & 256 \\
+        Head FC 2 & Linear(256$\to$7) & 7 \\
         \midrule
-        \multicolumn{2}{l}{\textbf{Total parameters}} & $\approx$ 11.2 M \\
+        \multicolumn{2}{l}{\textbf{Celkem parametrů}} & $\approx$ 11{,}7\,M \\
         \bottomrule
     \end{tabular}
     \label{tab:resnet_arch}
 \end{table}
 
-\textbf{Grad-CAM target:} Layer 4 (\texttt{layer4[-1]}) --- the last
-convolutional block before global pooling, producing $7\times7$ feature maps
-at the highest semantic level of the backbone.
+\textbf{Cíl Grad-CAM:} Vrstva 4 (\texttt{layer4[-1]}) --- poslední
+konvoluční blok před globálním sdružováním, produkující prostorové mapy
+$7\times7$ na nejvyšší sémantické úrovni páteře.
 
 % ══════════════════════════════════════════════════════════════════════════════
-\section{Training Strategy}
+\section{Tréninková strategie}
 \label{sec:training}
 % ══════════════════════════════════════════════════════════════════════════════
 
-\subsection{Two-Phase Fine-Tuning}
+\subsection{Dvoufázové jemné doladění}
 
-Direct fine-tuning of all parameters with a single learning rate risks
-overwriting the generalised ImageNet representations before the randomly
-initialised head stabilises. The two-phase approach avoids this:
+Přímé jemné doladění všech parametrů s jednou rychlostí učení riskuje
+přepsání generalizovaných reprezentací ImageNet dříve, než se náhodně
+inicializovaná hlavička stabilizuje. Dvoufázový přístup se tomu vyhýbá:
 
 \begin{table}[H]
     \centering
-    \caption{Two-phase training configuration for ResNet18.}
+    \caption{Konfigurace dvoufázového tréninku pro ResNet18.}
     \begin{tabular}{lccccl}
         \toprule
-        \textbf{Phase} & \textbf{Backbone} & \textbf{Head}
-        & \textbf{Epochs} & \textbf{LR backbone} & \textbf{Scheduler} \\
+        \textbf{Fáze} & \textbf{Páteř} & \textbf{Hlavička}
+        & \textbf{Epochy} & \textbf{LR páteř} & \textbf{Plánovač} \\
         \midrule
-        1 -- Frozen     & frozen & trainable & 5  & ---          & ReduceLROnPlateau \\
-        2 -- Fine-tune  & trainable & trainable & 15 & $3\times10^{-5}$ & CosineAnnealingLR \\
+        1 -- Zmrazená  & zmrazena    & trénuje se & 5  & ---              & ReduceLROnPlateau \\
+        2 -- Doladění  & trénuje se  & trénuje se & 15 & $3\times10^{-5}$ & CosineAnnealingLR \\
         \bottomrule
     \end{tabular}
     \label{tab:phases}
 \end{table}
 
-In Phase 2, \textbf{differential learning rates} are applied via separate
-parameter groups in AdamW:
+Ve fázi 2 jsou aplikovány \textbf{diferenciální rychlosti učení}
+prostřednictvím samostatných skupin parametrů v AdamW:
 
 \begin{equation}
-    \text{lr}_{\text{backbone}} = 3\times10^{-5}, \quad
-    \text{lr}_{\text{head}}     = 10^{-3}
+    \text{lr}_{\text{páteř}} = 3\times10^{-5}, \quad
+    \text{lr}_{\text{hlavička}} = 10^{-3}
     \label{eq:diff_lr}
 \end{equation}
 
-This allows the backbone to adapt gently to the dermoscopy domain while the
-head converges faster. The ratio of 33:1 between head and backbone learning
-rates prevents catastrophic forgetting of ImageNet features.
+To umožňuje páteři jemně se přizpůsobit doméně dermatoskopie, zatímco
+se hlavička konverguje rychleji. Poměr 33:1 mezi rychlostí učení hlavičky
+a páteře zabraňuje katastrofálnímu zapomínání příznaků ImageNet.
 
-\subsection{Loss Function}
+\subsection{Ztrátová funkce}
 
-Standard \textbf{cross-entropy loss} is used for both models:
+Pro oba modely je použita standardní \textbf{křížová entropická ztráta}:
 
 \begin{equation}
     \mathcal{L} = -\sum_{c=1}^{C} y_c \log \hat{p}_c
     \label{eq:ce_loss}
 \end{equation}
 
-where $C = 7$, $y_c \in \{0,1\}$ is the one-hot ground truth, and
-$\hat{p}_c$ is the predicted probability for class $c$.
-Class imbalance is handled at the \emph{sampling} level (Section~\ref{sec:data})
-rather than in the loss function, which keeps the loss gradients unmodified.
+kde $C = 7$, $y_c \in \{0,1\}$ je jednoznačná ground-truth a
+$\hat{p}_c$ je predikovaná pravděpodobnost pro třídu $c$.
+Nerovnováha tříd je řešena na úrovni \emph{vzorkování}
+(sekce~\ref{sec:data}) spíše než ve ztrátové funkci,
+čímž zůstávají gradienty ztráty nezměněny.
 
-\subsection{Training Curves}
+\subsection{Průběhy tréninku}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{plots/Baseline_CNN_history.png}
-    \caption{Baseline CNN training dynamics: train/val loss (left) and
-             accuracy (right) over 10 epochs.}
+    \caption{Průběh tréninku základní CNN: ztráta train/val (vlevo)
+             a přesnost (vpravo) v průběhu 10 epoch.}
     \label{fig:baseline_history}
 \end{figure}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{plots/ResNet18_Transfer_Learning_history.png}
-    \caption{ResNet18 training dynamics over 20 epochs (5 frozen + 15
-             fine-tuning).}
+    \caption{Průběh tréninku ResNet18 v průběhu 20 epoch
+             (5 zmrazených + 15 jemného doladění).}
     \label{fig:resnet_history}
 \end{figure}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{plots/comparison_training_curves.png}
-    \caption{Side-by-side training curves for both models. The vertical dashed
-             line marks epoch 5, when the ResNet18 backbone is unfrozen.
-             A characteristic accuracy jump is typically visible at this point.}
+    \caption{Průběhy tréninku obou modelů vedle sebe. Svislá přerušovaná
+             čára označuje epochu 5, kdy je páteř ResNet18 odmrazena.
+             V tomto bodě bývá typicky patrný charakteristický nárůst
+             přesnosti.}
     \label{fig:comparison_curves}
 \end{figure}
 
 % ══════════════════════════════════════════════════════════════════════════════
-\section{Evaluation Methodology}
+\section{Metodologie hodnocení}
 \label{sec:eval}
 % ══════════════════════════════════════════════════════════════════════════════
 
-\subsection{Why Accuracy Alone Is Insufficient}
+\subsection{Proč samotná přesnost nestačí}
 
-Given the 67\% majority class, a trivial classifier that always predicts
-\texttt{nv} achieves $\sim$67\% accuracy---far above random chance---while
-being clinically useless (it would miss every melanoma).
+Při 67\,\% většinové třídě dosahuje triviální klasifikátor, který vždy
+predikuje \texttt{nv}, $\sim$67\,\% přesnosti --- výrazně nad náhodnou
+šancí --- přičemž je klinicky bezužitečný (přehlédl by každý melanom).
 
-\subsection{Metrics}
+\subsection{Metriky}
 
 \begin{table}[H]
     \centering
-    \caption{Evaluation metrics and their roles.}
+    \caption{Evaluační metriky a jejich role.}
     \begin{tabular}{lp{9cm}}
         \toprule
-        \textbf{Metric} & \textbf{What it captures} \\
+        \textbf{Metrika} & \textbf{Co měří} \\
         \midrule
-        Weighted F1-score
-            & Per-class $F_1$ weighted by class support.
-              Penalises failures on minority classes, robust to imbalance. \\
-        Per-class AUC-ROC (OvR)
-            & One-vs-rest discrimination ability for each class,
-              independent of classification threshold. \\
-        Macro AUC-ROC
-            & Unweighted mean of per-class AUC-ROC;
-              treats all classes equally regardless of size. \\
-        Confusion Matrix
-            & Reveals which class pairs are most often confused
-              (e.g.\ \texttt{mel} vs.\ \texttt{nv}). \\
+        Vážené F1-skóre
+            & F1 pro každou třídu vážené podporou třídy.
+              Penalizuje selhání na menšinových třídách,
+              robustní vůči nerovnováze. \\
+        AUC-ROC pro třídy (OvR)
+            & Schopnost diskriminace one-vs-rest pro každou třídu,
+              nezávislá na klasifikačním prahu. \\
+        Makro AUC-ROC
+            & Nevážený průměr AUC-ROC pro jednotlivé třídy;
+              zachází se všemi třídami stejně bez ohledu na jejich velikost. \\
+        Matice záměn
+            & Odhaluje, které dvojice tříd jsou nejčastěji zaměňovány
+              (např.\ \texttt{mel} vs.\ \texttt{nv}). \\
         Grad-CAM
-            & Visual validation that the model attends to the
-              lesion rather than background artefacts. \\
+            & Vizuální validace, že model věnuje pozornost lézi,
+              a nikoli artefaktům pozadí. \\
         \bottomrule
     \end{tabular}
     \label{tab:metrics}
 \end{table}
 
-\subsection{Weighted F1-Score}
+\subsection{Vážené F1-skóre}
 
 \begin{equation}
-    F_1^{\text{weighted}} = \sum_{c=1}^{C}
+    F_1^{\text{vážené}} = \sum_{c=1}^{C}
         \frac{|\mathcal{S}_c|}{N} \cdot F_1^{(c)}, \quad
-    F_1^{(c)} = \frac{2 \cdot \text{precision}^{(c)} \cdot \text{recall}^{(c)}}
-                     {\text{precision}^{(c)} + \text{recall}^{(c)}}
+    F_1^{(c)} = \frac{2 \cdot \text{přesnost}^{(c)} \cdot \text{úplnost}^{(c)}}
+                     {\text{přesnost}^{(c)} + \text{úplnost}^{(c)}}
     \label{eq:f1}
 \end{equation}
 
-where $|\mathcal{S}_c|$ is the number of true samples for class $c$ and
-$N$ is the total test set size.
+kde $|\mathcal{S}_c|$ je počet skutečných vzorků třídy $c$ a
+$N$ je celková velikost testovací sady.
 
 \subsection{Grad-CAM}
 
-Gradient-weighted Class Activation Mapping~\cite{selvaraju2017gradcam}
-produces a spatial heatmap indicating which regions of the input image most
-influenced the prediction. For a target class $c$ and a convolutional feature
-map $A^k$ at the chosen layer:
+Gradient-weighted Class Activation
+Mapping~\cite{selvaraju2017gradcam} produkuje prostorovou tepelnou mapu
+ukazující, které oblasti vstupního snímku nejvíce ovlivnily predikci.
+Pro cílovou třídu $c$ a konvoluční mapu příznaků $A^k$ ve zvolené vrstvě:
 
 \begin{equation}
     \alpha_k^c = \frac{1}{Z} \sum_{i,j}
@@ -527,32 +519,32 @@ map $A^k$ at the chosen layer:
     \label{eq:gradcam_map}
 \end{equation}
 
-The resulting map is upsampled to the input resolution and overlaid on the
-original image. We apply Grad-CAM to the \texttt{layer4} output of ResNet18,
-which produces $7\times7$ spatial feature maps at the highest semantic level
-of the backbone.
+Výsledná mapa je zvětšena na vstupní rozlišení a překryta na originální
+snímek. Grad-CAM aplikujeme na výstup \texttt{layer4} ResNet18,
+který produkuje prostorové mapy $7\times7$ na nejvyšší sémantické úrovni
+páteře.
 
 % ══════════════════════════════════════════════════════════════════════════════
-\section{Results}
+\section{Výsledky}
 \label{sec:results}
 % ══════════════════════════════════════════════════════════════════════════════
 
-\subsection{Overall Performance}
+\subsection{Celkový výkon}
 
 \begin{table}[H]
     \centering
-    \caption{Test-set performance comparison.}
+    \caption{Porovnání výkonu na testovací sadě.}
     \begin{tabular}{lcccc}
         \toprule
-        \textbf{Model} & \textbf{Accuracy} & \textbf{Weighted F1}
-        & \textbf{Macro AUC-ROC} & \textbf{Parameters} \\
+        \textbf{Model} & \textbf{Přesnost} & \textbf{Vážené F1}
+        & \textbf{Makro AUC-ROC} & \textbf{Parametry} \\
         \midrule
-        Baseline CNN              & 59.72\% & 0.6363 & ---    & 2{,}490{,}631 \\
-        ResNet18 Transfer Learning & 77.30\% & 0.7824 & 0.9495 & 11{,}689{,}512 \\
+        Základní CNN               & 59{,}72\,\% & 0{,}6363 & ---    & 2\,490\,631 \\
+        ResNet18 s přenos. učením  & 77{,}30\,\% & 0{,}7824 & 0{,}9495 & 11\,689\,512 \\
         \midrule
-        \multicolumn{5}{l}{\textit{Literature benchmarks (HAM10000):}} \\
-        ResNet18 (He et al.)      & $\sim$80\% & --- & --- & 11.2\,M \\
-        VGG11                     & $\sim$80.5\% & --- & --- & 132.9\,M \\
+        \multicolumn{5}{l}{\textit{Referenční hodnoty z literatury (HAM10000):}} \\
+        ResNet18 (He et al.)       & $\sim$80\,\% & --- & --- & 11{,}2\,M \\
+        VGG11                      & $\sim$80{,}5\,\% & --- & --- & 132{,}9\,M \\
         \bottomrule
     \end{tabular}
     \label{tab:results}
@@ -561,136 +553,140 @@ of the backbone.
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.6\textwidth]{plots/accuracy_f1_comparison.png}
-    \caption{Overall Accuracy and Weighted F1 for both models.}
+    \caption{Celková přesnost a vážené F1 pro oba modely.}
     \label{fig:acc_f1}
 \end{figure}
 
-\subsection{Per-Class F1-Score}
+\subsection{F1-skóre pro jednotlivé třídy}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{plots/f1_comparison.png}
-    \caption{Per-class F1-score for Baseline CNN (blue) and ResNet18 (orange).
-             Rare classes (\texttt{df}, \texttt{vasc}) are typically the hardest
-             to classify correctly.}
+    \caption{F1-skóre pro jednotlivé třídy: základní CNN (modrá)
+             a ResNet18 (oranžová). Vzácné třídy (\texttt{df},
+             \texttt{vasc}) jsou obvykle nejobtížnější pro správnou
+             klasifikaci.}
     \label{fig:f1_per_class}
 \end{figure}
 
-\subsection{Confusion Matrix}
+\subsection{Matice záměn}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{plots/confusion_matrix.png}
-    \caption{Confusion matrix for ResNet18 on the test set.
-             Left: raw counts. Right: row-normalised (recall per class on the
-             diagonal). The most frequent off-diagonal entry is typically
-             \texttt{mel} confused with \texttt{nv}, reflecting their visual
-             similarity.}
+    \caption{Matice záměn pro ResNet18 na testovací sadě.
+             Vlevo: absolutní počty. Vpravo: řádkově normalizovaná
+             (recall pro třídu na diagonále). Nejčastějším
+             mimodiagonálním zápisem bývá \texttt{mel} zaměněný za
+             \texttt{nv}, což odráží jejich vizuální podobnost.}
     \label{fig:confusion}
 \end{figure}
 
-\subsection{Grad-CAM Analysis}
+\subsection{Analýza Grad-CAM}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.85\textwidth]{plots/gradcam_results.png}
-    \caption{Grad-CAM attention maps. Left column: original image with
-             ground-truth label (green = correct prediction, red = wrong).
-             Right column: Grad-CAM overlay showing the regions that drove
-             the model's decision. Well-classified samples show concentrated
-             attention on the lesion; misclassified samples tend to show
-             diffuse or misplaced attention.}
+    \caption{Mapy pozornosti Grad-CAM. Levý sloupec: originální snímek
+             s referenčním štítkem (zeleně = správná predikce,
+             červeně = chybná). Pravý sloupec: překryv Grad-CAM
+             ukazující oblasti, které řídily rozhodnutí modelu.
+             Správně klasifikované vzorky vykazují soustředěnou
+             pozornost na lézi; chybně klasifikované mají tendenci
+             vykazovat difúzní nebo posunutou aktivaci.}
     \label{fig:gradcam}
 \end{figure}
 
 % ══════════════════════════════════════════════════════════════════════════════
-\section{Discussion}
+\section{Diskuse}
 \label{sec:discussion}
 % ══════════════════════════════════════════════════════════════════════════════
 
-\paragraph{Class imbalance.}
-The \texttt{WeightedRandomSampler} is the single most important preprocessing
-decision in this pipeline. Without it, the model collapses to predicting only
-\texttt{nv}, achieving high accuracy while being clinically worthless.
+\paragraph{Nerovnováha tříd.}
+\texttt{WeightedRandomSampler} je nejdůležitějším rozhodnutím
+předzpracování v tomto procesu. Bez něj model predikuje pouze
+\texttt{nv}, dosahuje vysoké přesnosti, ale je klinicky bezcenný.
 
-\paragraph{Transfer learning vs.\ scratch.}
-ResNet18 fine-tuned from ImageNet weights substantially outperforms the
-Baseline CNN, despite having been trained on a domain (natural images) very
-different from dermoscopy. This confirms that low-level features---edges,
-colour gradients, textures---are highly transferable across visual domains.
+\paragraph{Přenosové učení vs.\ trénink od nuly.}
+ResNet18 jemně doladěný z vah ImageNet výrazně překonává základní CNN,
+přestože byl trénován na doméně (přirozené snímky) velmi odlišné od
+dermatoskopie. To potvrzuje, že nízkoúrovňové příznaky --- hrany,
+barevné gradienty, textury --- jsou vysoce přenositelné mezi vizuálními
+doménami.
 
-\paragraph{Hardest class pair: Melanoma vs.\ Nevus.}
-The confusion matrix consistently shows that \texttt{mel} is most often
-misclassified as \texttt{nv}. This pair is also the most clinically critical:
-a missed melanoma is a life-threatening error. This difficulty mirrors that of
-human expert performance, where distinguishing early-stage melanoma from an
-atypical nevus is the central challenge of dermoscopy.
+\paragraph{Nejtěžší dvojice tříd: Melanom vs.\ Névus.}
+Matice záměn konzistentně ukazuje, že \texttt{mel} je nejčastěji chybně
+klasifikován jako \texttt{nv}. Tato dvojice je také klinicky
+nejkritičtější: přehlédnutý melanom je život ohrožující chyba.
+Tato obtíž zrcadlí výkon lidských expertů, kde rozlišení časného stadia
+melanomu od atypického névusu je ústřední výzvou dermatoskopie.
 
-\paragraph{Grad-CAM validation.}
-For correctly classified samples, Grad-CAM confirms that the network attends
-to the lesion itself---not skin background, hair, or ruler artefacts that
-sometimes appear in dermoscopic images. Misclassified samples tend to show
-broader, less focused activation maps, suggesting uncertainty in the feature
-extraction.
+\paragraph{Validace Grad-CAM.}
+Pro správně klasifikované vzorky Grad-CAM potvrzuje, že síť věnuje
+pozornost samotné lézi --- nikoli kožnímu pozadí, vlasům nebo artefaktům
+pravítka, které se někdy v dermatoskopických snímcích vyskytují.
+Chybně klasifikované vzorky mají tendenci vykazovat širší, méně zaměřené
+aktivační mapy, což naznačuje nejistotu při extrakci příznaků.
 
-\paragraph{Possible improvements.}
+\paragraph{Možná zlepšení.}
 \begin{itemize}
-    \item \textbf{Stronger architecture}: EfficientNet-B3/B4 achieves higher
-          accuracy at similar parameter counts.
-    \item \textbf{Advanced augmentation}: MixUp~\cite{zhang2017mixup} or
-          CutMix interpolates between training samples and their labels,
-          regularising the model further.
-    \item \textbf{Test-Time Augmentation (TTA)}: averaging predictions over
-          multiple augmented views of the same image reduces variance.
-    \item \textbf{Focal Loss}: re-weights the cross-entropy loss to focus
-          training on hard-to-classify minority samples.
+    \item \textbf{Silnější architektura}: EfficientNet-B3/B4 dosahuje
+          vyšší přesnosti při podobném počtu parametrů.
+    \item \textbf{Pokročilá augmentace}: MixUp~\cite{zhang2017mixup}
+          nebo CutMix interpoluje mezi trénovacími vzorky a jejich
+          štítky, čímž model dále regularizuje.
+    \item \textbf{Test-Time Augmentation (TTA)}: průměrování predikcí
+          přes více augmentovaných pohledů téhož snímku snižuje rozptyl.
+    \item \textbf{Fokální ztráta}: převáží křížovou entropickou ztrátu
+          tak, aby se trénink soustředil na obtížně klasifikovatelné
+          vzorky menšinových tříd.
 \end{itemize}
 
 % ══════════════════════════════════════════════════════════════════════════════
-\section{Conclusion}
+\section{Závěr}
 \label{sec:conclusion}
 % ══════════════════════════════════════════════════════════════════════════════
 
-This project demonstrates a full machine-learning pipeline for dermoscopic
-image classification on the HAM10000 benchmark:
+Tento projekt demonstruje kompletní pipeline strojového učení pro
+klasifikaci dermatoskopických snímků na benchmarku HAM10000:
 
 \begin{enumerate}
-    \item \textbf{Exploratory analysis} revealed severe class imbalance and
-          guided the choice of \texttt{WeightedRandomSampler}.
-    \item \textbf{Baseline CNN} established a performance lower bound using
-          only domain-agnostic features learned from scratch.
-    \item \textbf{ResNet18 transfer learning} achieved substantially higher
-          performance by leveraging ImageNet pre-training and a two-phase
-          training strategy with differential learning rates.
-    \item \textbf{Grad-CAM} provided visual interpretability, confirming that
-          the model focuses on clinically relevant regions.
-    \item \textbf{Evaluation} went beyond accuracy to include weighted F1,
-          per-class AUC-ROC, and confusion matrices---metrics appropriate for
-          imbalanced medical datasets.
+    \item \textbf{Průzkumná analýza} odhalila výraznou nerovnováhu tříd
+          a vedla k volbě \texttt{WeightedRandomSampler}.
+    \item \textbf{Základní CNN} stanovila dolní hranici výkonu pomocí
+          pouze doménově agnostických příznaků naučených od nuly.
+    \item \textbf{ResNet18 s přenosovým učením} dosáhlo výrazně vyššího
+          výkonu využitím předtréninku na ImageNet a dvoufázové tréninkové
+          strategie s diferenciálními rychlostmi učení.
+    \item \textbf{Grad-CAM} poskytl vizuální interpretovatelnost
+          potvrzující, že model se zaměřuje na klinicky relevantní oblasti.
+    \item \textbf{Hodnocení} překročilo rámec přesnosti a zahrnulo vážené
+          F1, AUC-ROC pro jednotlivé třídy a matice záměn --- metriky
+          vhodné pro nevyvážené medicínské datasety.
 \end{enumerate}
 
 % ══════════════════════════════════════════════════════════════════════════════
-\section*{Appendix: Hyperparameters}
+\section*{Příloha: Hyperparametry}
 \label{sec:appendix}
 % ══════════════════════════════════════════════════════════════════════════════
-\addcontentsline{toc}{section}{Appendix: Hyperparameters}
+\addcontentsline{toc}{section}{Příloha: Hyperparametry}
 
 \begin{table}[H]
     \centering
-    \caption{Full hyperparameter configuration (\texttt{src/config.py}).}
+    \caption{Kompletní konfigurace hyperparametrů (\texttt{src/config.py}).}
     \begin{tabular}{llp{6.5cm}}
         \toprule
-        \textbf{Parameter} & \textbf{Value} & \textbf{Description} \\
+        \textbf{Parametr} & \textbf{Hodnota} & \textbf{Popis} \\
         \midrule
-        \texttt{IMG\_SIZE}        & 224      & Input resolution (px) \\
-        \texttt{BATCH\_SIZE}      & 32       & Samples per mini-batch \\
-        \texttt{EPOCHS\_FROZEN}   & 5        & Phase 1 epochs (frozen backbone) \\
-        \texttt{EPOCHS\_FINETUNE} & 15       & Phase 2 epochs (full fine-tuning) \\
-        \texttt{LR\_FROZEN}       & $10^{-3}$ & Head learning rate \\
-        \texttt{LR\_FINETUNE}     & $3\times10^{-5}$ & Backbone learning rate (Phase 2) \\
-        \texttt{SEED}             & 42       & Random seed for reproducibility \\
-        ImageNet $\mu$            & [0.485, 0.456, 0.406] & Normalisation mean (R, G, B) \\
-        ImageNet $\sigma$         & [0.229, 0.224, 0.225] & Normalisation std (R, G, B) \\
+        \texttt{IMG\_SIZE}        & 224       & Vstupní rozlišení (px) \\
+        \texttt{BATCH\_SIZE}      & 32        & Vzorků v mini-dávce \\
+        \texttt{EPOCHS\_FROZEN}   & 5         & Epochy fáze 1 (zmrazená páteř) \\
+        \texttt{EPOCHS\_FINETUNE} & 15        & Epochy fáze 2 (plné jemné doladění) \\
+        \texttt{LR\_FROZEN}       & $10^{-3}$ & Rychlost učení hlavičky \\
+        \texttt{LR\_FINETUNE}     & $3\times10^{-5}$ & Rychlost učení páteře (fáze 2) \\
+        \texttt{SEED}             & 42        & Náhodné semeno pro reprodukovatelnost \\
+        ImageNet $\mu$            & [0{,}485, 0{,}456, 0{,}406] & Střední hodnota normalizace (R, G, B) \\
+        ImageNet $\sigma$         & [0{,}229, 0{,}224, 0{,}225] & Směrodatná odchylka normalizace (R, G, B) \\
         \bottomrule
     \end{tabular}
     \label{tab:hyperparams}
@@ -701,30 +697,30 @@ image classification on the HAM10000 benchmark:
 \begin{thebibliography}{9}
 
 \bibitem{tschandl2018ham10000}
-P.~Tschandl, C.~Rosendahl, and H.~Kittler,
-``The HAM10000 dataset, a large collection of multi-source dermatoscopic images
-  of common pigmented skin lesions,''
-\textit{Scientific Data}, vol.~5, p.~180161, 2018.
+P.~Tschandl, C.~Rosendahl a H.~Kittler,
+„The HAM10000 dataset, a large collection of multi-source dermatoscopic images
+  of common pigmented skin lesions,"
+\textit{Scientific Data}, sv.~5, s.~180161, 2018.
 
 \bibitem{he2016resnet}
-K.~He, X.~Zhang, S.~Ren, and J.~Sun,
-``Deep residual learning for image recognition,''
-in \textit{Proc. CVPR}, pp.~770--778, 2016.
+K.~He, X.~Zhang, S.~Ren a J.~Sun,
+„Deep residual learning for image recognition,"
+in \textit{Proc. CVPR}, s.~770--778, 2016.
 
 \bibitem{deng2009imagenet}
-J.~Deng, W.~Dong, R.~Socher, L.~Li, K.~Li, and L.~Fei-Fei,
-``ImageNet: A large-scale hierarchical image database,''
-in \textit{Proc. CVPR}, pp.~248--255, 2009.
+J.~Deng, W.~Dong, R.~Socher, L.~Li, K.~Li a L.~Fei-Fei,
+„ImageNet: A large-scale hierarchical image database,"
+in \textit{Proc. CVPR}, s.~248--255, 2009.
 
 \bibitem{selvaraju2017gradcam}
-R.~R.~Selvaraju, M.~Cogswell, A.~Das, R.~Vedantam, D.~Parikh, and D.~Batra,
-``Grad-CAM: Visual explanations from deep networks via gradient-based
-  localization,''
-in \textit{Proc. ICCV}, pp.~618--626, 2017.
+R.~R.~Selvaraju, M.~Cogswell, A.~Das, R.~Vedantam, D.~Parikh a D.~Batra,
+„Grad-CAM: Visual explanations from deep networks via gradient-based
+  localization,"
+in \textit{Proc. ICCV}, s.~618--626, 2017.
 
 \bibitem{zhang2017mixup}
-H.~Zhang, M.~Ciss\'{e}, Y.~N.~Dauphin, and D.~Lopez-Paz,
-``mixup: Beyond empirical risk minimization,''
+H.~Zhang, M.~Ciss\'{e}, Y.~N.~Dauphin a D.~Lopez-Paz,
+„mixup: Beyond empirical risk minimization,"
 in \textit{Proc. ICLR}, 2018.
 
 \end{thebibliography}
