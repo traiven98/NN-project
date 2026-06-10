@@ -75,25 +75,6 @@
 \end{tabular}\par}
 
 {\normalsize Neuronové sítě \par}
-    \vfill
-    \begin{abstract}
-        \noindent
-        Tato zpráva představuje systém supervizované vícetrídní klasifikace
-        dermatoskopických snímků kožních lézí s využitím datasetu HAM10000
-        (10\,015 snímků, 7 tříd). Porovnáváme dvě architektury: čtyřvrstvou
-        \textbf{základní CNN} trénovanou od nuly a \textbf{ResNet18}
-        jemně doladěnou z vah ImageNet pomocí dvou-fázové tréninkové strategie.
-        Hlavní výzvou je výrazná nerovnováha tříd ---
-        \textit{Melanocytární névus} tvoří 67\,\% všech vzorků ---
-        řešená pomocí \texttt{WeightedRandomSampler}. Modely jsou hodnoceny
-        pomocí váženého F1-skóre, AUC-ROC pro jednotlivé třídy
-        a vizualizačních map Grad-CAM.
-        Přenosové učení výrazně překonalo základní linii:
-        ResNet18 dosáhlo přesnosti 77{,}30\,\% a makro AUC-ROC 0{,}9495,
-        ve srovnání s 59{,}72\,\% přesnosti základní CNN,
-        v souladu s referenční hodnotou $\sim$80\,\% přesnosti ResNet18
-        na tomto datasetu.
-    \end{abstract}
 \end{titlepage}
 
 \tableofcontents
@@ -105,28 +86,55 @@
 % ══════════════════════════════════════════════════════════════════════════════
 
 Rakovina kůže patří mezi nejrozšířenější nádorová onemocnění na celém světě.
+Dle odhadů Světové zdravotnické organizace je každoročně diagnostikováno
+přes tři miliony nových případů nemelanomových a více než 300\,000 případů
+melanomových kožních nádorů. Včasná diagnóza dramaticky zlepšuje prognózu
+pacienta: pětileté přežití u melanomu zachyceného v časném stadiu přesahuje
+98\,\%, zatímco u pokročilého stadia klesá na méně než 25\,\%.
+
 Dermatoskopie --- neinvazivní zobrazovací technika umožňující zvětšené
 zobrazení kožních struktur --- výrazně zlepšuje míru včasného záchytu,
 je-li prováděna vyškolenými dermatology. Přesná interpretace dermatoskopických
 snímků je však vysoce závislá na odbornosti lékaře, časově náročná
-a podléhá mezipozorovatelské variabilitě.
+a podléhá mezipozorovatelské variabilitě. Výzkumy ukazují, že zkušení
+dermatologové dosahují diagnostické přesnosti přibližně 75--84\,\%,
+přičemž mezi lékaři existují značné rozdíly. Automatizované systémy
+počítačového vidění proto představují slibný nástroj pro podporu klinického
+rozhodování.
 
 Cílem tohoto projektu je vytvořit automatický klasifikátor, který přiřadí
 dermatoskopický snímek do jedné ze sedmi diagnostických kategorií
-zahrnujících benigní, prekancerózní a maligní léze. Úloha je formulována
-jako \textbf{supervizovaná vícetrídní klasifikace obrázků}, přičemž
-referenční štítky jsou potvrzeny histopatologií, klinickým sledováním
-nebo expertním konsenzem.
+zahrnujících benigní, prekancerózní a maligní léze. Klasifikace je provedena
+na datasetu \textbf{HAM10000}~\cite{tschandl2018ham10000}, který obsahuje
+10\,015 snímků anotovaných histopatologií, klinickým sledováním nebo
+expertním konsenzem. Úloha je formulována jako
+\textbf{supervizovaná vícetrídní klasifikace obrázků}.
 
-Jsou porovnávány dva modely:
+Klíčovou výzvou je \textbf{výrazná nerovnováha tříd}: třída
+\textit{Melanocytární névus} (\texttt{nv}) tvoří 66{,}9\,\% všech vzorků,
+zatímco vzácné třídy mají zastoupení pod 2\,\%. Triviální klasifikátor,
+který vždy predikuje \texttt{nv}, by dosáhl $\sim$67\,\% přesnosti
+bez jakékoli klinické hodnoty. Proto jsou v projektu použity metriky
+nezávislé na distribuci tříd (vážené F1-skóre, AUC-ROC) a technika
+\texttt{WeightedRandomSampler} pro vyvážené vzorkování trénovacích dávek.
+
+Jsou porovnávány dvě architektury:
 \begin{itemize}
     \item \textbf{Základní CNN}: čtyřbloková konvoluční síť trénovaná
-          výhradně z náhodné inicializace, stanovující dolní hranici výkonu.
+          výhradně z náhodné inicializace, stanovující dolní hranici výkonu
+          bez využití předchozích znalostí.
     \item \textbf{ResNet18 s přenosovým učením}: reziduální síť
           předtrénovaná na ImageNet~\cite{deng2009imagenet}
           a jemně doladěná na HAM10000 pomocí dvou-fázové strategie
           s diferenciálními rychlostmi učení.
 \end{itemize}
+
+Výsledky ukazují, že přenosové učení výrazně překonává trénink od nuly:
+ResNet18 dosáhlo \textbf{77{,}30\,\%} přesnosti a makro AUC-ROC
+\textbf{0{,}9495} na testovací sadě, ve srovnání s 59{,}72\,\% přesnosti
+základní CNN. Pro vizuální interpretaci predikčního procesu jsou použity
+mapy Grad-CAM~\cite{selvaraju2017gradcam}, které potvrzují, že síť
+věnuje pozornost klinicky relevantním oblastem snímku.
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Dataset}
