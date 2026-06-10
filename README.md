@@ -437,6 +437,13 @@ All hyperparameters live in `src/config.py`:
 | Baseline CNN | **59.72%** | **0.6363** | — | 2,490,631 |
 | ResNet18 Transfer Learning | **77.30%** | **0.7824** | **0.9495** | 11,689,512 |
 
+### Literature benchmarks (HAM10000)
+
+| Model | Accuracy |
+|-------|----------|
+| ResNet18 | ~80% |
+| VGG11 | ~80.5% |
+
 ---
 
 ## Key Takeaways
