@@ -81,11 +81,13 @@ dermatofibroma     █                                    115  ( 1.1%)
 
 ### Data split
 
+Split is performed at **lesion level** (`lesion_id`) to prevent data leakage — all images of the same physical lesion go to the same subset.
+
 ```
 10,015 images
     │
-    ├── Train  7,010  (70%) ──── WeightedRandomSampler
-    ├── Val    1,503  (15%) ──── stratified, no augmentation
+    ├── Train  6,981  (70%) ──── WeightedRandomSampler
+    ├── Val    1,532  (15%) ──── stratified, no augmentation
     └── Test   1,502  (15%) ──── stratified, never seen during training
 ```
 
@@ -166,7 +168,7 @@ Input  3 × 224 × 224
   Linear(4096 → 512) + ReLU + Dropout(0.4)
   Linear(512 → 7)
 
-  Total parameters: ~4.7 M
+  Total parameters: ~2.5 M
 ```
 
 | Design choice | Rationale |
@@ -287,6 +289,9 @@ All plots are saved to `plots/` after a full training run.
 
 | File | Content | Stage |
 |------|---------|-------|
+| `class_distribution.png` | Class imbalance — bar chart + pie chart | EDA |
+| `sample_images.png` | One sample image per class | EDA |
+| `patient_demographics.png` | Patient age histogram + sex distribution | EDA |
 | `Baseline_CNN_history.png` | Train/val loss & accuracy — Baseline CNN | 4 |
 | `ResNet18_Transfer_Learning_history.png` | Train/val loss & accuracy — both phases combined | 5 |
 | `comparison_training_curves.png` | **Both models on shared axes**; vertical dashed line marks backbone unfreeze | 5 |
@@ -340,6 +345,8 @@ NN-project/
 │   ├── evaluate.py    — plot_confusion_matrix · plot_f1_comparison
 │   │                    plot_accuracy_comparison · get_probabilities · full_report
 │   ├── gradcam.py     — visualize_gradcam
+│   ├── eda.py         — plot_class_distribution · plot_sample_images
+│   │                    plot_patient_demographics · run_eda
 │   └── main.py        — entry point, runs all stages end-to-end
 │
 ├── checkpoints/                    ← git-ignored
@@ -425,12 +432,10 @@ All hyperparameters live in `src/config.py`:
 
 ## 12. Results
 
-> Fill in after training is complete.
-
 | Model | Test Accuracy | Weighted F1 | Macro AUC-ROC | Parameters |
 |-------|:------------:|:-----------:|:-------------:|:----------:|
-| Baseline CNN | — | — | — | ~4.7 M |
-| ResNet18 Transfer Learning | — | — | — | ~11.2 M |
+| Baseline CNN | **59.72%** | **0.6363** | — | 2,490,631 |
+| ResNet18 Transfer Learning | **77.30%** | **0.7824** | **0.9495** | 11,689,512 |
 
 ### Literature benchmarks (HAM10000)
 
